@@ -78,15 +78,27 @@ Goal: every test below should be exercised on at least one macOS install **and**
 
 ## 6. Updates
 
-Required env: `WORKSPACE_UPDATE_FEED_URL` pointed at the staged JSON feed for the test build.
+The app is distributed unsigned, so there is no in-app auto-update — the Required Update screen and optional banner both link to the GitHub Releases page for manual download.
+
+By default the app reads the JSON feed from this repo's GitHub Releases (`https://github.com/no4jargon/Janus-Layer-0/releases/latest/download/latest.json`). To test against a staged feed without cutting a real release, host a `latest.json` somewhere reachable and launch the app with `WORKSPACE_UPDATE_FEED_URL=<staged-url>`.
+
+The default release flow forces every prior version to update (see `docs/RELEASE.md`). Section 6 covers both the forced and optional paths.
 
 | # | Step | Expected |
 |---|---|---|
-| 6.1 | Stage a feed where `latestVersion = currentVersion` | Settings → **Check for updates** → "Up to date" |
-| 6.2 | Stage a feed where `latestVersion > currentVersion`, `minSupportedVersion <= currentVersion` | Optional update banner appears in sidebar |
-| 6.3 | Click **Download** in the banner | Banner shows `Downloading… N%`; on completion offers **Install & restart** |
-| 6.4 | Click **Install & restart** | App quits, installs new version, relaunches |
-| 6.5 | Stage a feed where `minSupportedVersion > currentVersion` | App opens directly into Required Update screen; workspace inaccessible until update completes |
+| 6.1 | Stage a feed where `latestVersion = currentVersion` | Settings → **Check for updates** → "Up to date"; no banner; workspace loads normally |
+| 6.2 | Stage a feed where `latestVersion > currentVersion` and `minSupportedVersion <= currentVersion` | Optional update banner appears at the top of the sidebar with the new version number, a **Download** link, and a **Dismiss** button |
+| 6.3 | Click **Download** in the optional banner | System browser opens the GitHub release page (`/releases/tag/v<version>`); the app remains usable |
+| 6.4 | Manually download the installer from GitHub, install over the running app, relaunch | New version launches; banner is gone; workspace loads normally |
+| 6.5 | Stage a feed where `minSupportedVersion > currentVersion` | App opens directly into the full-window **Update required** screen on next launch; sidebar / thread / AI panel are inaccessible; only **Download installer from GitHub** is available |
+| 6.6 | Click **Download installer from GitHub** on the required screen | System browser opens the release page; the desktop app stays on the blocking screen |
+| 6.7 | Manually install the new build over the existing one, relaunch | New version launches; required screen is gone; workspace loads normally |
+| 6.8 | While on the required screen, try to bypass via window menus / DevTools | No code path exits the screen short of installing the new version; verify by inspecting React tree / IPC calls |
+
+Notes for testers:
+- macOS: first launch of an unsigned build needs **right-click → Open** the first time, or `xattr -d com.apple.quarantine "/Applications/Workspace App.app"`. Document this in the release notes when you ship.
+- Windows: first launch shows SmartScreen warning. Click **More info → Run anyway**.
+- The blocking screen polls `latest.json` only on launch, so updating the feed mid-session does not unblock a running app — the user must relaunch (the same way they would after installing a new version).
 
 ## 7. Migration recovery
 

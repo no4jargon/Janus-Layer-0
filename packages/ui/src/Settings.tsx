@@ -247,7 +247,7 @@ export const SettingsModal = ({ snapshot, onClose }: Props) => {
           <section className="settings-section">
             <h4>Updates</h4>
             <p className="settings-hint">
-              Checks the configured update feed (set{' '}
+              Checks the GitHub Releases update feed (override with{' '}
               <code>WORKSPACE_UPDATE_FEED_URL</code>). Beta channel only for
               now. Required updates block usage if the local version is below
               the minimum supported version.

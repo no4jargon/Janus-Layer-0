@@ -70,6 +70,13 @@ const createMainWindow = async () => {
     win.show();
   });
 
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
+
   if (process.env.UI_DEV_URL) {
     await win.loadURL(process.env.UI_DEV_URL);
     win.webContents.openDevTools({ mode: 'detach' });
@@ -391,16 +398,10 @@ const configureAutoUpdater = () => {
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.allowDowngrade = false;
 
-  const feedUrl = process.env.WORKSPACE_UPDATE_FEED_URL;
-  if (feedUrl) {
-    try {
-      autoUpdater.setFeedURL({ provider: 'generic', url: feedUrl });
-    } catch (error) {
-      runtime?.logger?.warn?.('autoUpdater setFeedURL failed', {
-        error: String(error),
-      });
-    }
-  }
+  // electron-updater reads provider/owner/repo from the bundled app-update.yml
+  // (built from build.publish in package.json). Don't override here — the
+  // WORKSPACE_UPDATE_FEED_URL env var only drives the JSON metadata feed used
+  // by createUpdateChecker for forced-update enforcement.
 
   autoUpdater.on('checking-for-update', () => {
     broadcastEvent('workspace:update:event', { kind: 'checking' });
@@ -447,16 +448,14 @@ const configureAutoUpdater = () => {
   });
 };
 
+const DEFAULT_UPDATE_FEED_URL =
+  'https://github.com/no4jargon/Janus-Layer-0/releases/latest/download/latest.json';
+
 const runUpdateCheck = async (input) => {
   const feedUrl =
-    input?.feedUrl || process.env.WORKSPACE_UPDATE_FEED_URL;
-  if (!feedUrl) {
-    return {
-      kind: 'unconfigured',
-      message:
-        'No update feed configured. Set WORKSPACE_UPDATE_FEED_URL or pass feedUrl.',
-    };
-  }
+    input?.feedUrl ||
+    process.env.WORKSPACE_UPDATE_FEED_URL ||
+    DEFAULT_UPDATE_FEED_URL;
   const checker = createUpdateChecker({
     feedUrl,
     currentVersion: app.getVersion(),
@@ -540,7 +539,7 @@ const bootstrap = async () => {
   await createMainWindow();
   broadcastSnapshot();
 
-  if (!isDev && process.env.WORKSPACE_UPDATE_FEED_URL) {
+  if (!isDev) {
     configureAutoUpdater();
     runUpdateCheck().catch((error) => {
       runtime?.logger?.warn?.('initial update check failed', {

@@ -38,8 +38,9 @@
       "output": "dist"
     },
     "publish": {
-      "provider": "generic",
-      "url": "https://updates.example.com/workspace-app/beta"
+      "provider": "github",
+      "owner": "no4jargon",
+      "repo": "Janus-Layer-0"
     },
     "mac": {
       "category": "public.app-category.productivity",

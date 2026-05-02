@@ -1,19 +1,21 @@
 # Productization Progress Tracker
 
 Status: active
-Last updated: 2026-05-02
+Last updated: 2026-05-03
 Scope tracked here: desktop-first, local-first freelancer communications workspace derived from the original `Baileys/demo` prototype.
 
 ## Overall status
 
-Current phase: **Phase 1–4 complete in code** (all v1 plan items shipped). Outstanding work is operational only: an actual signed installer requires Apple/Microsoft developer credentials, and the update feed needs to be hosted.
+Current phase: **Phase 1–4 complete in code**, with one deliberate scope shift in distribution: builds ship **unsigned** via **GitHub Releases**, with a per-release `latest.json` driving a full-window forced-update screen on every prior version by default. Users click through to the GitHub release page in their browser to download and install the new installer. Auto-download / quit-and-install via `electron-updater` is intentionally not used because unsigned macOS binaries cannot self-replace; the wiring is left in place behind feature flags so it can be re-enabled if/when builds are signed.
+
+The first draft release (`v0.1.0`, 10 assets including `latest.json`) has been verified end-to-end. Outstanding work is QA against installed builds and the first non-zero version bump that actually exercises the forced-update path.
 
 Overall summary:
 - **Phase 0 is complete.**
 - **Phase 1 is complete** — runtime, DB, logger, settings, migration recovery all live behind package boundaries.
 - **Phase 2 is complete** — Gmail connector + send outbox, WhatsApp Baileys connector + send outbox, attachment download UX, compose/reply UX in the renderer, live event subscriptions for sync + WhatsApp messages.
-- **Phase 3 in progress** — cluster CRUD + multi-select UX + AI workflow extraction panel ported from the demo (running against Ollama via `@workspace/ai`); cluster + AI outputs persisted in DB.
-- **Phase 4 still not started**.
+- **Phase 3 is complete** — cluster CRUD + multi-select UX + AI workflow extraction panel ported from the demo, persisted in DB; settings + onboarding modals; cluster rename/recolor right-click menu.
+- **Phase 4 is complete in code** for the unsigned distribution model — diagnostics export, version-compare update checker, `latest.json` generation + upload, full-window forced-update screen, optional sidebar banner (both link to GitHub Releases for manual install), `pnpm release:desktop` builds + publishes installers and `latest.json` to a draft release.
 
 The renderer mirrors the demo prototype's UX 1:1: 3-pane layout (sidebar with WhatsApp / Email / Clusters tabs + More-channels menu, thread + composer, AI panel with cluster + lookback hours pickers). Cluster state moved from `localStorage` into the DB.
 
@@ -76,17 +78,19 @@ The renderer mirrors the demo prototype's UX 1:1: 3-pane layout (sidebar with Wh
 
 ### Phase 4 completed
 - [x] Diagnostics export IPC (`workspace:diagnostics:export`) producing a sanitized JSON bundle (app + paths + migrations + connector states + log tail + backup files)
-- [x] Update checker (`createUpdateChecker` in `@workspace/core`) with version compare, optional vs required modes, configurable feed URL via `WORKSPACE_UPDATE_FEED_URL`
-- [x] `electron-updater` wired (download progress + apply, gated to production mode); IPCs `workspace:update:download` / `workspace:update:install`; events forwarded as `workspace:update:event`
-- [x] Required-update enforcement screen (full-window, blocks workspace until upgraded)
-- [x] Optional-update banner in the sidebar with download progress + install
-- [x] electron-builder release config (mac dmg + zip with hardened runtime + entitlements file at `apps/desktop/build/entitlements.mac.plist`, win nsis, linux AppImage); `pnpm release:desktop` toggles between unsigned-dir (default) and signed-release modes via `WORKSPACE_RELEASE=1` and `CSC_*` / `APPLE_*` env vars
+- [x] Update checker (`createUpdateChecker` in `@workspace/core`) with version compare, optional vs required modes; defaults to the GitHub Releases `latest.json` for this repo, overridable via `WORKSPACE_UPDATE_FEED_URL`
+- [x] **Distribution model: unsigned builds via GitHub Releases.** Required + optional update UI both link to the GitHub release page in the system browser; users manually download the new installer and install it over the running app. No in-app auto-download / quit-and-install (unsigned macOS binaries can't self-replace via Gatekeeper). The `electron-updater` wiring + IPCs (`workspace:update:download` / `workspace:update:install`) are kept in place behind feature flags so they can be re-enabled if/when builds are signed.
+- [x] Required-update enforcement screen — full-window, blocks workspace, **default behavior on every release** (forces every prior version to update). Opt out per release with `MIN_SUPPORTED_VERSION` set below the new version when a release should not block existing users.
+- [x] Optional-update banner in the sidebar (only fires when `MIN_SUPPORTED_VERSION` is opted out below `latestVersion`); links to GitHub release page; dismissable.
+- [x] electron-builder release config (mac dmg + zip, win nsis, linux AppImage) with `provider: github` for `no4jargon/Janus-Layer-0`. `pnpm release:desktop` toggles between unsigned-dir (default) and unsigned-release-publish modes via `WORKSPACE_RELEASE=1`. `CSC_*` / `APPLE_*` signing env vars are still wired so signing can be turned on later without code changes.
+- [x] Update artifact hosting: GitHub Releases. `apps/desktop/electron/package.js` writes `dist/latest.json` per release (with `MIN_SUPPORTED_VERSION` defaulting to the new version → forces every prior build) and uploads it via `gh release upload` when `WORKSPACE_PUBLISH=1`.
+- [x] First draft release (`v0.1.0`) verified end-to-end on GitHub: `latest.json` + `latest-mac.yml` + 4 installers (arm64 + x64 dmg/zip) + 4 blockmaps uploaded as a draft.
 - [x] Migration testing harness (`scripts/test-migrations.js`) — fresh bootstrap, idempotency, v1-baseline upgrade with row preservation; runs via `pnpm test:migrations`
-- [x] Friends/family QA plan in `docs/QA_PLAN.md`
+- [x] CI workflow: `.github/workflows/ci.yml` runs install + build + typecheck + migrations test + verify on every PR
+- [x] Release workflow: `.github/workflows/release.yml` triggers on `v*` tag push (or manual dispatch); builds + publishes draft release + `latest.json` using the repo's `GITHUB_TOKEN` (no PAT needed)
+- [x] Friends/family QA plan in `docs/QA_PLAN.md` (section 6 reflects the unsigned + manual-download flow)
 - [x] Release + update guide in `docs/RELEASE.md`
-- [ ] Sign with real Apple/Microsoft developer credentials (operational, not code)
-- [ ] Host the actual update feed (operational, not code)
-- [ ] Run a real end-to-end QA pass against installed beta build
+- [ ] Run a real end-to-end QA pass against an installed beta build, including a forced-update dry run: ship release N+1 with `MIN_SUPPORTED_VERSION` ≥ N, install N, confirm N is blocked on launch
 
 ## Phase status
 
@@ -103,7 +107,7 @@ Status: complete
 Status: complete (clusters, AI panel, onboarding, settings, cluster context menu all shipped)
 
 ## Phase 4 — release readiness
-Status: code complete (diagnostics, updater download/install, required + optional update UX, electron-builder release config, migration test harness, QA plan and release guide all in place). Operational steps — actual signing identities, hosting the update feed, and running QA on real installs — are next.
+Status: code complete (diagnostics, updater download/install, required + optional update UX, electron-builder release config, GitHub Releases publish + per-release `latest.json` generation, migration test harness, QA plan and release guide all in place). Operational steps — actual signing identities and running QA (including a forced-update dry run) on real installs — are next.
 
 ## Current problems / risks
 
@@ -115,10 +119,13 @@ Status: code complete (diagnostics, updater download/install, required + optiona
 - Workflow extraction calls `OLLAMA_BASE_URL` (default `127.0.0.1:11434`) with `OLLAMA_MODEL` (default `llama3:8b`). Requires Ollama running locally; otherwise the AI panel surfaces an error.
 
 ### 3. Update/migration complexity
-- Updater and forced-update flow still need to be designed end-to-end before beta distribution.
+- Forced-update flow has not yet been exercised against a real install — the first GitHub release with `MIN_SUPPORTED_VERSION` set should be treated as a load-bearing test.
+- The release script's `gh release upload` step assumes `gh` CLI + a `GH_TOKEN` with `contents: write`; if that step is silently skipped, the JSON feed gets stale and forced updates won't trigger. Verify after the first publish.
 
 ## Immediate next steps
 
-1. Stand up the staging update feed (host `latest-mac.yml` + `latest.yml` + the JSON metadata feed used by `createUpdateChecker`) and run section 6 of `docs/QA_PLAN.md` end-to-end.
-2. Provision Apple / Microsoft signing credentials and run `WORKSPACE_RELEASE=1 pnpm release:desktop` to produce the first signed beta build.
-3. Run the full friends/family QA pass against the signed build; track regressions in `docs/QA_PLAN.md` section 9.
+1. Promote the verified `v0.1.0` draft to a published release; install it on at least one Mac and one Windows machine; record `<data>/logs/app.log` location + diagnostics export shape per `docs/QA_PLAN.md` section 8.
+2. Cut a `v0.1.1` test release with `MIN_SUPPORTED_VERSION=0.1.1` set; confirm the installed `v0.1.0` lands directly on the **Update required** screen on next launch and stays there until the new installer is run.
+3. Cut a `v0.1.2` opt-out release with `MIN_SUPPORTED_VERSION=0.1.0` set; confirm the installed `v0.1.0` shows the optional sidebar banner instead of the blocking screen.
+4. Run the full friends/family QA pass (`docs/QA_PLAN.md` sections 1–7) and update section 9's regression watchlist.
+5. (Later) provision Apple / Microsoft signing credentials and re-bind the renderer's update buttons to the in-app `electron-updater` flow that's still wired but unused.
