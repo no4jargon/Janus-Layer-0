@@ -9,7 +9,7 @@ export const RequiredUpdateScreen = ({ info }: Props) => {
     <div className="required-update-shell">
       <h1>Update required</h1>
       <p>
-        This version of Workspace App is no longer supported and needs to be
+        This version of Janus Layer 0 is no longer supported and needs to be
         updated before continuing.
       </p>
       <ul>

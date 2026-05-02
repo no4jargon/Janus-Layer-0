@@ -64,7 +64,7 @@ jobs:
           WORKSPACE_PUBLISH: '1'
           WORKSPACE_RELEASE_CHANNEL: ${{ inputs.channel || 'beta' }}
           MIN_SUPPORTED_VERSION: ${{ inputs.min_supported_version }}
-        run: pnpm --filter @workspace/desktop release
+        run: pnpm --filter @janus/desktop release
 
       - name: Upload latest.json artifact
         uses: actions/upload-artifact@v4

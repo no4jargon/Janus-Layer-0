@@ -7,22 +7,22 @@ import {
   buildDiagnosticsBundle,
   createUpdateChecker,
   createWorkspaceRuntime,
-} from '@workspace/core';
+} from '@janus/core';
 import {
   createAiOutputStore,
   createClusterStore,
   createEmailStore,
   createWhatsAppStore,
-} from '@workspace/db';
+} from '@janus/db';
 import {
   createGmailConnector,
   createGmailSendService,
-} from '@workspace/connectors-gmail';
+} from '@janus/connectors-gmail';
 import {
   createWhatsAppConnector,
   createWhatsAppSendService,
-} from '@workspace/connectors-whatsapp';
-import { createWorkflowExtractor } from '@workspace/ai';
+} from '@janus/connectors-whatsapp';
+import { createWorkflowExtractor } from '@janus/ai';
 import electronUpdater from 'electron-updater';
 import { loadWorkspaceEnv } from './env.js';
 
@@ -325,7 +325,7 @@ const registerIpcHandlers = () => {
 
     const result = await dialog.showSaveDialog(mainWindow, {
       title: 'Save diagnostics bundle',
-      defaultPath: `workspace-diagnostics-${new Date()
+      defaultPath: `janus-diagnostics-${new Date()
         .toISOString()
         .replace(/[:.]/g, '-')}.json`,
       filters: [{ name: 'JSON', extensions: ['json'] }],

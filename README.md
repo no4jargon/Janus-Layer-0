@@ -1,4 +1,4 @@
-# Workspace App
+# Janus Layer 0
 
 Desktop-first, local-first communications workspace for freelancers.
 
@@ -44,7 +44,7 @@ pnpm typecheck          # typecheck all packages
 
 See `docs/RELEASE.md` for signing + publish details, and `docs/QA_PLAN.md` for the friends/family beta checklist.
 
-`pnpm dev` triggers a one-shot build of `@workspace/{shared,db,core,connectors-gmail,connectors-whatsapp}` so the Electron main process can resolve them at runtime.
+`pnpm dev` triggers a one-shot build of `@janus/{shared,db,core,connectors-gmail,connectors-whatsapp}` so the Electron main process can resolve them at runtime.
 
 ## Runtime data conventions
 

@@ -1,3 +1,3 @@
 export const desktopApp = {
-  name: 'workspace-app-desktop',
+  name: 'janus-layer-0-desktop',
 };

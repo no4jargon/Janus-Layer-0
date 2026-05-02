@@ -923,7 +923,7 @@ body {
 	}
 }
 
-/* migration recovery screen (added for workspace-app) */
+/* migration recovery screen (added for janus-layer-0) */
 .migration-failure-shell {
 	max-width: 640px;
 	margin: 60px auto;

@@ -1,11 +1,11 @@
 import crypto from 'node:crypto';
 import type { WASocket } from 'baileys';
-import type { Logger } from '@workspace/core';
+import type { Logger } from '@janus/core';
 import {
   mkMessageKey,
   type WaOutboxMessageRecord,
   type WhatsAppStore,
-} from '@workspace/db';
+} from '@janus/db';
 
 export type SendTextInput = {
   jid: string;

@@ -2,7 +2,7 @@
 
 Status: planning document
 Owner: Anuj
-Location: `workspace-app/docs/PLAN.md` (moved from `demo/`).
+Location: `janus-layer-0/docs/PLAN.md` (moved from `demo/`).
 
 ## 1. Product definition
 

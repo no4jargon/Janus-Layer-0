@@ -1,5 +1,5 @@
 {
-  "name": "@workspace/connectors-gmail",
+  "name": "@janus/connectors-gmail",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -19,8 +19,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@workspace/core": "workspace:*",
-    "@workspace/db": "workspace:*",
-    "@workspace/shared": "workspace:*"
+    "@janus/core": "workspace:*",
+    "@janus/db": "workspace:*",
+    "@janus/shared": "workspace:*"
   }
 }

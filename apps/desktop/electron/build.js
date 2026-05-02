@@ -10,13 +10,13 @@ const uiDist = path.join(repoRoot, 'packages', 'ui', 'dist');
 const stagedUiDist = path.join(__dirname, 'ui-dist');
 
 const packages = [
-  '@workspace/shared',
-  '@workspace/db',
-  '@workspace/core',
-  '@workspace/ai',
-  '@workspace/connectors-gmail',
-  '@workspace/connectors-whatsapp',
-  '@workspace/ui',
+  '@janus/shared',
+  '@janus/db',
+  '@janus/core',
+  '@janus/ai',
+  '@janus/connectors-gmail',
+  '@janus/connectors-whatsapp',
+  '@janus/ui',
 ];
 
 const filterArgs = packages.flatMap((name) => `--filter ${name}`).join(' ');

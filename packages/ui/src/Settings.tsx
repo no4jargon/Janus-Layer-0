@@ -302,7 +302,7 @@ export const OnboardingModal = ({ onDone }: OnboardingProps) => {
         aria-modal="true"
       >
         <div className="modal-title-row">
-          <h3>Welcome to Workspace App</h3>
+          <h3>Welcome to Janus Layer 0</h3>
         </div>
         <div className="settings-body">
           <p>

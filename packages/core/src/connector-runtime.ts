@@ -1,4 +1,4 @@
-import type { ConnectorStateStore } from '@workspace/db';
+import type { ConnectorStateStore } from '@janus/db';
 import type { Logger } from './logger.js';
 
 export type ConnectorKind = 'gmail' | 'whatsapp';

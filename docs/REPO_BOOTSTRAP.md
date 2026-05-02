@@ -24,7 +24,7 @@ This file is the practical companion to:
 ## 3. Recommended repository layout
 
 ```text
-workspace-app/
+janus-layer-0/
   apps/
     desktop/
       src/

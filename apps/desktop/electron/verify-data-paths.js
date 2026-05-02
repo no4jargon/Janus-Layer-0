@@ -4,8 +4,8 @@ import {
   createFileLogger,
   ensureAppDataPaths,
   resolveAppDataPaths,
-} from '@workspace/core';
-import { bootstrapDatabase } from '@workspace/db';
+} from '@janus/core';
+import { bootstrapDatabase } from '@janus/db';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, '..', '..', '..');
@@ -20,7 +20,7 @@ const devPaths = resolveAppDataPaths({
 const prodPaths = resolveAppDataPaths({
   mode: 'production',
   repoRoot,
-  userDataPath: path.join(repoRoot, '.prod-data-smoke', 'Workspace App'),
+  userDataPath: path.join(repoRoot, '.prod-data-smoke', 'Janus Layer 0'),
 });
 
 for (const paths of [devPaths, prodPaths]) {

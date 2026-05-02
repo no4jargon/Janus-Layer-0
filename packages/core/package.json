@@ -1,5 +1,5 @@
 {
-  "name": "@workspace/core",
+  "name": "@janus/core",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -19,7 +19,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@workspace/db": "workspace:*",
-    "@workspace/shared": "workspace:*"
+    "@janus/db": "workspace:*",
+    "@janus/shared": "workspace:*"
   }
 }

@@ -5,8 +5,8 @@ import {
   normalizeMessageContent,
 } from 'baileys';
 import type { WAMessage, WAMessageKey } from 'baileys';
-import type { WaMessageRecord } from '@workspace/db';
-import { mkMessageKey } from '@workspace/db';
+import type { WaMessageRecord } from '@janus/db';
+import { mkMessageKey } from '@janus/db';
 
 export const isInterestingJid = (jid: string | null | undefined): boolean => {
   if (!jid) return false;

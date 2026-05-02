@@ -1,4 +1,4 @@
-# Demo Import Audit (`Baileys/demo` -> `workspace-app`)
+# Demo Import Audit (`Baileys/demo` -> `janus-layer-0`)
 
 Status: active
 Last updated: 2026-05-02
@@ -7,7 +7,7 @@ Source audited: `/Users/anujshah/Desktop/Projects/Baileys/demo`
 
 ## Objective
 
-Import useful prototype logic into `workspace-app` while preserving product constraints:
+Import useful prototype logic into `janus-layer-0` while preserving product constraints:
 - desktop-first
 - local-first
 - privacy-first
@@ -122,7 +122,7 @@ Decision:
 - **Imported with refactor — complete.**
 
 Imported now:
-- TypeScript `createWorkflowExtractor` in `@workspace/ai/src/ollama.ts`
+- TypeScript `createWorkflowExtractor` in `@janus/ai/src/ollama.ts`
 - Workflow prompt and `WORKFLOW_CATEGORIES` constants ported verbatim
 - Renderer AI panel: cluster picker + lookback hours pickers + run-for-cluster + run-for-all-clusters + progress bar + collated output rendering
 - AI outputs persisted to `ai_outputs` table via IPC `workspace:ai:save-output`

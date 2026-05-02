@@ -1,5 +1,5 @@
 {
-  "name": "@workspace/desktop",
+  "name": "@janus/desktop",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -13,12 +13,12 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@workspace/ai": "workspace:*",
-    "@workspace/connectors-gmail": "workspace:*",
-    "@workspace/connectors-whatsapp": "workspace:*",
-    "@workspace/core": "workspace:*",
-    "@workspace/db": "workspace:*",
-    "@workspace/shared": "workspace:*",
+    "@janus/ai": "workspace:*",
+    "@janus/connectors-gmail": "workspace:*",
+    "@janus/connectors-whatsapp": "workspace:*",
+    "@janus/core": "workspace:*",
+    "@janus/db": "workspace:*",
+    "@janus/shared": "workspace:*",
     "baileys": "^7.0.0-rc.9",
     "electron-updater": "^6.6.2"
   },
@@ -28,8 +28,8 @@
     "vite": "^8.0.10"
   },
   "build": {
-    "appId": "com.workspace.app",
-    "productName": "Workspace App",
+    "appId": "com.janus.layer0",
+    "productName": "Janus Layer 0",
     "files": [
       "electron/**/*",
       "package.json"

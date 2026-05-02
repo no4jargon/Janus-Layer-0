@@ -12,12 +12,12 @@ const uiRoot = path.join(repoRoot, 'packages', 'ui');
 
 const buildPackages = () => {
   const packages = [
-    '@workspace/shared',
-    '@workspace/db',
-    '@workspace/core',
-    '@workspace/ai',
-    '@workspace/connectors-gmail',
-    '@workspace/connectors-whatsapp',
+    '@janus/shared',
+    '@janus/db',
+    '@janus/core',
+    '@janus/ai',
+    '@janus/connectors-gmail',
+    '@janus/connectors-whatsapp',
   ];
 
   const filterArgs = packages.flatMap((name) => ['--filter', name]);

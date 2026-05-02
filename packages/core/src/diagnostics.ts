@@ -5,7 +5,7 @@ import {
   statSync,
 } from 'node:fs';
 import path from 'node:path';
-import type { Database } from '@workspace/db';
+import type { Database } from '@janus/db';
 import type { AppDataPaths, RuntimeMode } from './data-paths.js';
 import type { WorkspaceSettings } from './settings-store.js';
 

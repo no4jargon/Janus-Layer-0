@@ -181,7 +181,7 @@ export const runDesktopOAuth = async (
         res.statusCode = 200;
         res.setHeader('content-type', 'text/html; charset=utf-8');
         res.end(
-          '<html><body><h3>Workspace App</h3><p>Gmail connected. You can close this tab and return to the app.</p></body></html>',
+          '<html><body><h3>Janus Layer 0</h3><p>Gmail connected. You can close this tab and return to the app.</p></body></html>',
         );
 
         clearTimeout(timeout);

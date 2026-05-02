@@ -18,8 +18,8 @@ import type {
   WAMessageUpdate,
   WASocket,
 } from 'baileys';
-import type { Logger as CoreLogger, WorkspaceConnector } from '@workspace/core';
-import type { WhatsAppStore } from '@workspace/db';
+import type { Logger as CoreLogger, WorkspaceConnector } from '@janus/core';
+import type { WhatsAppStore } from '@janus/db';
 import {
   buildMessageRow,
   isInterestingJid,
@@ -187,7 +187,7 @@ export const createWhatsAppConnector = (
     const sock = makeWASocket({
       version,
       logger: internalPino,
-      browser: Browsers.macOS('Workspace App'),
+      browser: Browsers.macOS('Janus Layer 0'),
       auth: {
         creds: state.creds,
         keys: makeCacheableSignalKeyStore(state.keys, internalPino),

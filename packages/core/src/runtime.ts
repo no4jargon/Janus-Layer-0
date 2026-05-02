@@ -3,7 +3,7 @@ import {
   createConnectorStateStore,
   type Database,
   type MigrationFailure,
-} from '@workspace/db';
+} from '@janus/db';
 import {
   createConnectorRuntime,
   type ConnectorKind,
@@ -124,7 +124,7 @@ export const createWorkspaceRuntime = (
     });
   }
 
-  logger.info('workspace runtime initialized', {
+  logger.info('janus runtime initialized', {
     mode: input.mode,
     appVersion: input.appVersion,
     dbPath: paths.dbPath,
@@ -160,7 +160,7 @@ export const createWorkspaceRuntime = (
       } catch (error) {
         logger.warn('db close failed', { error: String(error) });
       }
-      logger.info('workspace runtime closed');
+      logger.info('janus runtime closed');
     },
   };
 };

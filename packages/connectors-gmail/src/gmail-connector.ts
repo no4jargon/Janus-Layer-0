@@ -1,8 +1,8 @@
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { Logger, WorkspaceConnector } from '@workspace/core';
-import type { EmailStore } from '@workspace/db';
+import type { Logger, WorkspaceConnector } from '@janus/core';
+import type { EmailStore } from '@janus/db';
 import {
   authedFetch,
   assertOauthConfig,

@@ -1,12 +1,12 @@
 # Prototype Migration Map
 
-This file tracks source-material copied from `Baileys/demo` into `workspace-app`, plus where the production implementation now lives in package boundaries.
+This file tracks source-material copied from `Baileys/demo` into `janus-layer-0`, plus where the production implementation now lives in package boundaries.
 
 ## Reference copies (read-only)
 
 These files were copied verbatim from the prototype and remain in the package source trees as historical references. They are excluded from `tsc` builds via per-package `exclude: ["src/prototype-*.ts"]`.
 
-| Prototype source | Reference copy in workspace-app |
+| Prototype source | Reference copy in janus-layer-0 |
 |---|---|
 | `demo/db.ts` | `packages/db/src/prototype-db.ts` |
 | `demo/email.ts` | `packages/connectors-gmail/src/prototype-email.ts` |

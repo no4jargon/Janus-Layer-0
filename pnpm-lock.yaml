@@ -17,22 +17,22 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@workspace/ai':
+      '@janus/ai':
         specifier: workspace:*
         version: link:../../packages/ai
-      '@workspace/connectors-gmail':
+      '@janus/connectors-gmail':
         specifier: workspace:*
         version: link:../../packages/connectors-gmail
-      '@workspace/connectors-whatsapp':
+      '@janus/connectors-whatsapp':
         specifier: workspace:*
         version: link:../../packages/connectors-whatsapp
-      '@workspace/core':
+      '@janus/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@workspace/db':
+      '@janus/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@workspace/shared':
+      '@janus/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       baileys:
@@ -56,13 +56,13 @@ importers:
 
   packages/connectors-gmail:
     dependencies:
-      '@workspace/core':
+      '@janus/core':
         specifier: workspace:*
         version: link:../core
-      '@workspace/db':
+      '@janus/db':
         specifier: workspace:*
         version: link:../db
-      '@workspace/shared':
+      '@janus/shared':
         specifier: workspace:*
         version: link:../shared
 
@@ -71,13 +71,13 @@ importers:
       '@hapi/boom':
         specifier: ^10.0.1
         version: 10.0.1
-      '@workspace/core':
+      '@janus/core':
         specifier: workspace:*
         version: link:../core
-      '@workspace/db':
+      '@janus/db':
         specifier: workspace:*
         version: link:../db
-      '@workspace/shared':
+      '@janus/shared':
         specifier: workspace:*
         version: link:../shared
       baileys:
@@ -89,10 +89,10 @@ importers:
 
   packages/core:
     dependencies:
-      '@workspace/db':
+      '@janus/db':
         specifier: workspace:*
         version: link:../db
-      '@workspace/shared':
+      '@janus/shared':
         specifier: workspace:*
         version: link:../shared
 

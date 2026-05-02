@@ -15,7 +15,7 @@ Runs `electron-builder --dir` with `mac.identity=null` and `publish=null`. Produ
 ```bash
 WORKSPACE_RELEASE=1 pnpm package:desktop
 # or
-pnpm --filter @workspace/desktop release
+pnpm --filter @janus/desktop release
 ```
 
 This switches `electron-builder` to the production config in `apps/desktop/package.json`:
@@ -69,7 +69,7 @@ export GH_TOKEN=$(gh auth token)
 # Optional: force users on older versions to update before they can keep using the app
 export MIN_SUPPORTED_VERSION=0.2.0
 
-WORKSPACE_RELEASE=1 WORKSPACE_PUBLISH=1 pnpm --filter @workspace/desktop release
+WORKSPACE_RELEASE=1 WORKSPACE_PUBLISH=1 pnpm --filter @janus/desktop release
 ```
 
 Under the hood:
@@ -99,7 +99,7 @@ To ship a release that should NOT block existing users, set `MIN_SUPPORTED_VERSI
 
 ```bash
 MIN_SUPPORTED_VERSION=0.1.0 WORKSPACE_RELEASE=1 WORKSPACE_PUBLISH=1 \
-  pnpm --filter @workspace/desktop release
+  pnpm --filter @janus/desktop release
 ```
 
 Result: anyone on `< 0.1.0` is still forced; anyone between `0.1.0` and (latest − 1) sees the optional sidebar banner; anyone on the latest is up-to-date.

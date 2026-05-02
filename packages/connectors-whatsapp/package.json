@@ -1,5 +1,5 @@
 {
-  "name": "@workspace/connectors-whatsapp",
+  "name": "@janus/connectors-whatsapp",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -20,9 +20,9 @@
   },
   "dependencies": {
     "@hapi/boom": "^10.0.1",
-    "@workspace/core": "workspace:*",
-    "@workspace/db": "workspace:*",
-    "@workspace/shared": "workspace:*",
+    "@janus/core": "workspace:*",
+    "@janus/db": "workspace:*",
+    "@janus/shared": "workspace:*",
     "baileys": "^7.0.0-rc.9",
     "pino": "^9.13.1"
   }

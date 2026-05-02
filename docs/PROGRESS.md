@@ -32,7 +32,7 @@ The renderer mirrors the demo prototype's UX 1:1: 3-pane layout (sidebar with Wh
 - [x] Decided DB changes should be handled by **startup migrations** bundled with releases
 
 ### Phase 0 completed
-- [x] Created new repository scaffold (`workspace-app`)
+- [x] Created new repository scaffold (`janus-layer-0`)
 - [x] Initialized git repository
 - [x] Created monorepo structure (`apps/`, `packages/`, `docs/`, `scripts/`)
 - [x] Added workspace configuration (`pnpm-workspace.yaml`, root `package.json`, `tsconfig.base.json`)
@@ -43,8 +43,8 @@ The renderer mirrors the demo prototype's UX 1:1: 3-pane layout (sidebar with Wh
 - [x] Added ADR for extraction strategy (`docs/ADR-001-phase0-extraction-strategy.md`)
 
 ### Phase 1 completed
-- [x] Runtime bootstrap orchestration extracted into `@workspace/core`
-- [x] DB bootstrap + migration runner extracted into `@workspace/db`
+- [x] Runtime bootstrap orchestration extracted into `@janus/core`
+- [x] DB bootstrap + migration runner extracted into `@janus/db`
 - [x] Pre-migration database backups (timestamped copies under `<data>/backups/`)
 - [x] Migration failure surfaced via runtime snapshot; UI shows retry screen and a retry IPC restarts the runtime
 - [x] File-based structured logging (`<data>/logs/app.log`)
@@ -53,8 +53,8 @@ The renderer mirrors the demo prototype's UX 1:1: 3-pane layout (sidebar with Wh
 - [x] Workspace `.env` loading in desktop runtime
 
 ### Phase 2 completed
-- [x] `@workspace/db` typed repos: `createEmailStore`, `createWhatsAppStore`, `createConnectorStateStore`, `createClusterStore`, `createAiOutputStore`
-- [x] Gmail OAuth desktop flow + token refresh + profile fetch + thread/message mirror sync (`@workspace/connectors-gmail`)
+- [x] `@janus/db` typed repos: `createEmailStore`, `createWhatsAppStore`, `createConnectorStateStore`, `createClusterStore`, `createAiOutputStore`
+- [x] Gmail OAuth desktop flow + token refresh + profile fetch + thread/message mirror sync (`@janus/connectors-gmail`)
 - [x] Gmail send outbox pipeline (`createGmailSendService`) wired through IPC
 - [x] WhatsApp connector on top of `baileys` (multi-file auth state, QR streaming, reconnect with backoff, mirror events)
 - [x] WhatsApp send outbox pipeline (`createWhatsAppSendService`)
@@ -68,7 +68,7 @@ The renderer mirrors the demo prototype's UX 1:1: 3-pane layout (sidebar with Wh
 - [x] Cluster persistence schema (`clusters`, `cluster_members`, `ai_outputs`)
 - [x] Cluster CRUD IPC + multi-select with Cmd-click + Shift-click range
 - [x] Cluster grouping view in sidebar (Clusters tab)
-- [x] Ollama workflow extractor (`@workspace/ai`) with the original prototype prompt
+- [x] Ollama workflow extractor (`@janus/ai`) with the original prototype prompt
 - [x] AI panel: cluster picker + lookback hours pickers + run-for-cluster + run-for-all + collated output rendering
 - [x] Cheat code (`wipeclusters` to clear all, Cmd/Ctrl+E for cheat list)
 - [x] Coming-soon channels banner (Slack / Teams / Discord / Telegram placeholder)
@@ -78,7 +78,7 @@ The renderer mirrors the demo prototype's UX 1:1: 3-pane layout (sidebar with Wh
 
 ### Phase 4 completed
 - [x] Diagnostics export IPC (`workspace:diagnostics:export`) producing a sanitized JSON bundle (app + paths + migrations + connector states + log tail + backup files)
-- [x] Update checker (`createUpdateChecker` in `@workspace/core`) with version compare, optional vs required modes; defaults to the GitHub Releases `latest.json` for this repo, overridable via `WORKSPACE_UPDATE_FEED_URL`
+- [x] Update checker (`createUpdateChecker` in `@janus/core`) with version compare, optional vs required modes; defaults to the GitHub Releases `latest.json` for this repo, overridable via `WORKSPACE_UPDATE_FEED_URL`
 - [x] **Distribution model: unsigned builds via GitHub Releases.** Required + optional update UI both link to the GitHub release page in the system browser; users manually download the new installer and install it over the running app. No in-app auto-download / quit-and-install (unsigned macOS binaries can't self-replace via Gatekeeper). The `electron-updater` wiring + IPCs (`workspace:update:download` / `workspace:update:install`) are kept in place behind feature flags so they can be re-enabled if/when builds are signed.
 - [x] Required-update enforcement screen — full-window, blocks workspace, **default behavior on every release** (forces every prior version to update). Opt out per release with `MIN_SUPPORTED_VERSION` set below the new version when a release should not block existing users.
 - [x] Optional-update banner in the sidebar (only fires when `MIN_SUPPORTED_VERSION` is opted out below `latestVersion`); links to GitHub release page; dismissable.
