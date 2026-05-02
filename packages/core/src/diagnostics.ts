@@ -7,11 +7,11 @@ import {
 import path from 'node:path';
 import type { Database } from '@janus/db';
 import type { AppDataPaths, RuntimeMode } from './data-paths.js';
-import type { WorkspaceSettings } from './settings-store.js';
+import type { JanusSettings } from './settings-store.js';
 
-const SETTING_REDACTIONS: Array<keyof WorkspaceSettings> = [];
+const SETTING_REDACTIONS: Array<keyof JanusSettings> = [];
 
-const sanitizeSettings = (settings: WorkspaceSettings): WorkspaceSettings => {
+const sanitizeSettings = (settings: JanusSettings): JanusSettings => {
   const copy = { ...settings };
   for (const key of SETTING_REDACTIONS) {
     (copy as Record<string, unknown>)[key as string] = null;
@@ -28,7 +28,7 @@ export type DiagnosticsBundle = {
     nodeVersion: string;
   };
   paths: AppDataPaths;
-  settings: WorkspaceSettings;
+  settings: JanusSettings;
   schemaMigrations: Array<{ id: string; appliedAt: string }>;
   connectors: Array<{
     connector: string;
@@ -45,7 +45,7 @@ export type BuildDiagnosticsInput = {
   appVersion: string;
   mode: RuntimeMode;
   paths: AppDataPaths;
-  settings: WorkspaceSettings;
+  settings: JanusSettings;
   db: Database;
   logTailLines?: number;
 };

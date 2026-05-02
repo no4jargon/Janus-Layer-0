@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react';
 
 type Snapshot = Awaited<
-  ReturnType<NonNullable<typeof window.workspaceApi>['getRuntimeState']>
+  ReturnType<NonNullable<typeof window.janusApi>['getRuntimeState']>
 >;
 
 type WaEvent = Parameters<
-  NonNullable<typeof window.workspaceApi>['events']['onWhatsAppEvent']
+  NonNullable<typeof window.janusApi>['events']['onWhatsAppEvent']
 >[0] extends (event: infer T) => void
   ? T
   : never;
 
 type ConnectorEvent = Parameters<
-  NonNullable<typeof window.workspaceApi>['events']['onConnectorEvent']
+  NonNullable<typeof window.janusApi>['events']['onConnectorEvent']
 >[0] extends (event: infer T) => void
   ? T
   : never;
@@ -20,10 +20,10 @@ export const useRuntimeSnapshot = () => {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
 
   useEffect(() => {
-    if (!window.workspaceApi) return;
+    if (!window.janusApi) return;
     let mounted = true;
 
-    window.workspaceApi
+    window.janusApi
       .getRuntimeState()
       .then((value) => {
         if (mounted) setSnapshot(value);
@@ -32,7 +32,7 @@ export const useRuntimeSnapshot = () => {
         /* surface via UI elsewhere */
       });
 
-    const unsubscribe = window.workspaceApi.events.onRuntimeSnapshot((next) => {
+    const unsubscribe = window.janusApi.events.onRuntimeSnapshot((next) => {
       if (mounted) setSnapshot(next);
     });
 
@@ -47,8 +47,8 @@ export const useRuntimeSnapshot = () => {
 
 export const useWhatsAppEvents = (handler: (event: WaEvent) => void) => {
   useEffect(() => {
-    if (!window.workspaceApi) return;
-    const unsubscribe = window.workspaceApi.events.onWhatsAppEvent(handler);
+    if (!window.janusApi) return;
+    const unsubscribe = window.janusApi.events.onWhatsAppEvent(handler);
     return unsubscribe;
   }, [handler]);
 };
@@ -57,8 +57,8 @@ export const useConnectorEvents = (
   handler: (event: ConnectorEvent) => void,
 ) => {
   useEffect(() => {
-    if (!window.workspaceApi) return;
-    const unsubscribe = window.workspaceApi.events.onConnectorEvent(handler);
+    if (!window.janusApi) return;
+    const unsubscribe = window.janusApi.events.onConnectorEvent(handler);
     return unsubscribe;
   }, [handler]);
 };

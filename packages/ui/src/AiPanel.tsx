@@ -80,7 +80,7 @@ const fetchItemMessages = async (
     text: string;
   }>
 > => {
-  const api = window.workspaceApi;
+  const api = window.janusApi;
   if (!api) return [];
 
   if (item.sourceType === 'whatsapp_chat') {
@@ -279,7 +279,7 @@ export const AiPanel = ({
         return;
       }
 
-      const result = await window.workspaceApi!.ai.extractWorkflow(
+      const result = await window.janusApi!.ai.extractWorkflow(
         payload.promptText,
       );
       const summary = [
@@ -291,7 +291,7 @@ export const AiPanel = ({
       setStatus('Cluster extraction complete.');
 
       try {
-        await window.workspaceApi!.ai.saveOutput({
+        await window.janusApi!.ai.saveOutput({
           clusterId: selectedCluster.id,
           kind: 'workflow.cluster',
           inputSummary: `messages=${payload.includedCount} hours=${selectedHours}`,
@@ -344,7 +344,7 @@ export const AiPanel = ({
           });
         } else {
           try {
-            const out = await window.workspaceApi!.ai.extractWorkflow(
+            const out = await window.janusApi!.ai.extractWorkflow(
               payload.promptText,
             );
             results.push({
@@ -376,7 +376,7 @@ export const AiPanel = ({
       );
 
       try {
-        await window.workspaceApi!.ai.saveOutput({
+        await window.janusApi!.ai.saveOutput({
           clusterId: null,
           kind: 'workflow.all-clusters',
           inputSummary: `clusters=${sortedClusters.length} hours=${selectedAllHours}`,

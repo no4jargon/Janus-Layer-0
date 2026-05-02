@@ -6,7 +6,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import {
   buildDiagnosticsBundle,
   createUpdateChecker,
-  createWorkspaceRuntime,
+  createJanusRuntime,
 } from '@janus/core';
 import {
   createAiOutputStore,
@@ -24,7 +24,7 @@ import {
 } from '@janus/connectors-whatsapp';
 import { createWorkflowExtractor } from '@janus/ai';
 import electronUpdater from 'electron-updater';
-import { loadWorkspaceEnv } from './env.js';
+import { loadJanusEnv } from './env.js';
 
 const { autoUpdater } = electronUpdater;
 
@@ -48,7 +48,7 @@ const broadcastEvent = (channel, payload) => {
 
 const broadcastSnapshot = () => {
   if (!runtime) return;
-  broadcastEvent('workspace:runtime-snapshot', runtime.getSnapshot());
+  broadcastEvent('janus:runtime-snapshot', runtime.getSnapshot());
 };
 
 const createMainWindow = async () => {
@@ -97,42 +97,42 @@ const newId = (prefix) =>
   `${prefix}_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
 
 const registerIpcHandlers = () => {
-  ipcMain.handle('workspace:get-runtime-state', () =>
+  ipcMain.handle('janus:get-runtime-state', () =>
     requireRuntime().getSnapshot(),
   );
 
-  ipcMain.handle('workspace:update-settings', (_event, patch) => {
+  ipcMain.handle('janus:update-settings', (_event, patch) => {
     const current = requireRuntime().settingsStore.write(patch || {});
     rebuildWorkflowExtractor(current);
     broadcastSnapshot();
     return runtime.getSnapshot();
   });
 
-  ipcMain.handle('workspace:connector:connect', async (_event, connector) => {
+  ipcMain.handle('janus:connector:connect', async (_event, connector) => {
     await requireRuntime().connectorRuntime.connect(connector);
     broadcastSnapshot();
     return runtime.getSnapshot();
   });
 
-  ipcMain.handle('workspace:connector:disconnect', async (_event, connector) => {
+  ipcMain.handle('janus:connector:disconnect', async (_event, connector) => {
     await requireRuntime().connectorRuntime.disconnect(connector);
     broadcastSnapshot();
     return runtime.getSnapshot();
   });
 
-  ipcMain.handle('workspace:connector:sync', async (_event, connector) => {
-    broadcastEvent('workspace:connector:event', {
+  ipcMain.handle('janus:connector:sync', async (_event, connector) => {
+    broadcastEvent('janus:connector:event', {
       connector,
       type: 'sync.started',
     });
     try {
       await requireRuntime().connectorRuntime.syncNow(connector);
-      broadcastEvent('workspace:connector:event', {
+      broadcastEvent('janus:connector:event', {
         connector,
         type: 'sync.completed',
       });
     } catch (error) {
-      broadcastEvent('workspace:connector:event', {
+      broadcastEvent('janus:connector:event', {
         connector,
         type: 'sync.failed',
         error: error instanceof Error ? error.message : String(error),
@@ -142,13 +142,13 @@ const registerIpcHandlers = () => {
     return runtime.getSnapshot();
   });
 
-  ipcMain.handle('workspace:gmail:list-threads', () => {
+  ipcMain.handle('janus:gmail:list-threads', () => {
     if (!runtime) return [];
     const store = createEmailStore(runtime.db);
     return store.getEmailThreads('local-user');
   });
 
-  ipcMain.handle('workspace:gmail:get-thread', (_event, threadId) => {
+  ipcMain.handle('janus:gmail:get-thread', (_event, threadId) => {
     if (!runtime) return null;
     const store = createEmailStore(runtime.db);
     const thread = store.getEmailThreadById(threadId);
@@ -161,12 +161,12 @@ const registerIpcHandlers = () => {
     return { thread, messages: messagesWithAttachments };
   });
 
-  ipcMain.handle('workspace:gmail:send', async (_event, payload) => {
+  ipcMain.handle('janus:gmail:send', async (_event, payload) => {
     if (!gmailSendService) {
       throw new Error('Gmail send service is not available.');
     }
     const result = await gmailSendService.sendEmail(payload);
-    broadcastEvent('workspace:gmail:event', {
+    broadcastEvent('janus:gmail:event', {
       type: 'send.completed',
       payload: result,
     });
@@ -174,7 +174,7 @@ const registerIpcHandlers = () => {
   });
 
   ipcMain.handle(
-    'workspace:gmail:download-attachment',
+    'janus:gmail:download-attachment',
     async (_event, attachmentId) => {
       if (!gmailConnector) throw new Error('Gmail connector unavailable.');
       const file = await gmailConnector.getAttachmentContent(attachmentId);
@@ -192,7 +192,7 @@ const registerIpcHandlers = () => {
   );
 
   ipcMain.handle(
-    'workspace:gmail:open-attachment',
+    'janus:gmail:open-attachment',
     async (_event, attachmentId) => {
       if (!gmailConnector) throw new Error('Gmail connector unavailable.');
       const file = await gmailConnector.getAttachmentContent(attachmentId);
@@ -201,13 +201,13 @@ const registerIpcHandlers = () => {
     },
   );
 
-  ipcMain.handle('workspace:whatsapp:list-chats', () => {
+  ipcMain.handle('janus:whatsapp:list-chats', () => {
     if (!runtime) return [];
     const store = createWhatsAppStore(runtime.db);
     return store.getChats();
   });
 
-  ipcMain.handle('workspace:whatsapp:get-chat', (_event, jid) => {
+  ipcMain.handle('janus:whatsapp:get-chat', (_event, jid) => {
     if (!runtime) return [];
     const store = createWhatsAppStore(runtime.db);
     const messages = store.getMessagesForChat(jid, 200);
@@ -217,18 +217,18 @@ const registerIpcHandlers = () => {
     }));
   });
 
-  ipcMain.handle('workspace:whatsapp:send', async (_event, payload) => {
+  ipcMain.handle('janus:whatsapp:send', async (_event, payload) => {
     if (!whatsappSendService) {
       throw new Error('WhatsApp send service is not available.');
     }
     return whatsappSendService.sendText(payload);
   });
 
-  ipcMain.handle('workspace:whatsapp:status', () => {
+  ipcMain.handle('janus:whatsapp:status', () => {
     return whatsappConnector?.getStatus() ?? null;
   });
 
-  ipcMain.handle('workspace:cluster:list', () => {
+  ipcMain.handle('janus:cluster:list', () => {
     if (!runtime) return { clusters: [], clusterMap: {} };
     const store = createClusterStore(runtime.db);
     return {
@@ -237,7 +237,7 @@ const registerIpcHandlers = () => {
     };
   });
 
-  ipcMain.handle('workspace:cluster:create', (_event, input) => {
+  ipcMain.handle('janus:cluster:create', (_event, input) => {
     const store = createClusterStore(requireRuntime().db);
     const id = newId('cluster');
     const cluster = store.create({
@@ -254,18 +254,18 @@ const registerIpcHandlers = () => {
     };
   });
 
-  ipcMain.handle('workspace:cluster:rename', (_event, input) => {
+  ipcMain.handle('janus:cluster:rename', (_event, input) => {
     const store = createClusterStore(requireRuntime().db);
     return store.rename(input.id, input.name, input.color ?? null);
   });
 
-  ipcMain.handle('workspace:cluster:delete', (_event, id) => {
+  ipcMain.handle('janus:cluster:delete', (_event, id) => {
     const store = createClusterStore(requireRuntime().db);
     store.remove(id);
     return { clusterMap: store.getClusterMap() };
   });
 
-  ipcMain.handle('workspace:cluster:add-members', (_event, input) => {
+  ipcMain.handle('janus:cluster:add-members', (_event, input) => {
     const store = createClusterStore(requireRuntime().db);
     store.addMembers(input.clusterId, input.members || []);
     return {
@@ -274,29 +274,29 @@ const registerIpcHandlers = () => {
     };
   });
 
-  ipcMain.handle('workspace:cluster:remove-member', (_event, input) => {
+  ipcMain.handle('janus:cluster:remove-member', (_event, input) => {
     const store = createClusterStore(requireRuntime().db);
     store.removeMember(input.clusterId, input.source, input.sourceRef);
     return { clusterMap: store.getClusterMap() };
   });
 
-  ipcMain.handle('workspace:cluster:list-members', (_event, clusterId) => {
+  ipcMain.handle('janus:cluster:list-members', (_event, clusterId) => {
     const store = createClusterStore(requireRuntime().db);
     return store.listMembers(clusterId);
   });
 
-  ipcMain.handle('workspace:cluster:clear-all', () => {
+  ipcMain.handle('janus:cluster:clear-all', () => {
     const store = createClusterStore(requireRuntime().db);
     store.clearAll();
     return { clusterMap: {}, clusters: [] };
   });
 
-  ipcMain.handle('workspace:ai:extract-workflow', async (_event, text) => {
+  ipcMain.handle('janus:ai:extract-workflow', async (_event, text) => {
     if (!workflowExtractor) throw new Error('AI runtime unavailable.');
     return workflowExtractor.extract(text);
   });
 
-  ipcMain.handle('workspace:ai:save-output', (_event, input) => {
+  ipcMain.handle('janus:ai:save-output', (_event, input) => {
     const store = createAiOutputStore(requireRuntime().db);
     return store.create({
       id: newId('ai_output'),
@@ -308,12 +308,12 @@ const registerIpcHandlers = () => {
     });
   });
 
-  ipcMain.handle('workspace:ai:list-outputs', (_event, clusterId) => {
+  ipcMain.handle('janus:ai:list-outputs', (_event, clusterId) => {
     const store = createAiOutputStore(requireRuntime().db);
     return store.listForCluster(clusterId);
   });
 
-  ipcMain.handle('workspace:diagnostics:export', async () => {
+  ipcMain.handle('janus:diagnostics:export', async () => {
     const r = requireRuntime();
     const bundle = buildDiagnosticsBundle({
       appVersion: app.getVersion(),
@@ -337,11 +337,11 @@ const registerIpcHandlers = () => {
     return { saved: true, savedPath: result.filePath };
   });
 
-  ipcMain.handle('workspace:update:check', async (_event, input) => {
+  ipcMain.handle('janus:update:check', async (_event, input) => {
     return runUpdateCheck(input);
   });
 
-  ipcMain.handle('workspace:update:download', async () => {
+  ipcMain.handle('janus:update:download', async () => {
     if (isDev) {
       return {
         kind: 'skipped',
@@ -356,12 +356,12 @@ const registerIpcHandlers = () => {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : String(error);
-      broadcastEvent('workspace:update:event', { kind: 'error', message });
+      broadcastEvent('janus:update:event', { kind: 'error', message });
       return { kind: 'error', message };
     }
   });
 
-  ipcMain.handle('workspace:update:install', () => {
+  ipcMain.handle('janus:update:install', () => {
     if (isDev) {
       return {
         kind: 'skipped',
@@ -372,9 +372,9 @@ const registerIpcHandlers = () => {
     return { kind: 'installing' };
   });
 
-  ipcMain.handle('workspace:update:last', () => lastUpdateInfo);
+  ipcMain.handle('janus:update:last', () => lastUpdateInfo);
 
-  ipcMain.handle('workspace:migration:retry', async () => {
+  ipcMain.handle('janus:migration:retry', async () => {
     runtime?.close();
     runtime = await createRuntime();
     rebuildWorkflowExtractor(runtime.settingsStore.read());
@@ -400,15 +400,15 @@ const configureAutoUpdater = () => {
 
   // electron-updater reads provider/owner/repo from the bundled app-update.yml
   // (built from build.publish in package.json). Don't override here — the
-  // WORKSPACE_UPDATE_FEED_URL env var only drives the JSON metadata feed used
+  // JANUS_UPDATE_FEED_URL env var only drives the JSON metadata feed used
   // by createUpdateChecker for forced-update enforcement.
 
   autoUpdater.on('checking-for-update', () => {
-    broadcastEvent('workspace:update:event', { kind: 'checking' });
+    broadcastEvent('janus:update:event', { kind: 'checking' });
   });
 
   autoUpdater.on('update-available', (info) => {
-    broadcastEvent('workspace:update:event', {
+    broadcastEvent('janus:update:event', {
       kind: 'available',
       version: info?.version,
       releaseDate: info?.releaseDate,
@@ -417,21 +417,21 @@ const configureAutoUpdater = () => {
   });
 
   autoUpdater.on('update-not-available', (info) => {
-    broadcastEvent('workspace:update:event', {
+    broadcastEvent('janus:update:event', {
       kind: 'not-available',
       version: info?.version,
     });
   });
 
   autoUpdater.on('error', (error) => {
-    broadcastEvent('workspace:update:event', {
+    broadcastEvent('janus:update:event', {
       kind: 'error',
       message: error instanceof Error ? error.message : String(error),
     });
   });
 
   autoUpdater.on('download-progress', (progress) => {
-    broadcastEvent('workspace:update:event', {
+    broadcastEvent('janus:update:event', {
       kind: 'progress',
       percent: progress.percent,
       bytesPerSecond: progress.bytesPerSecond,
@@ -441,7 +441,7 @@ const configureAutoUpdater = () => {
   });
 
   autoUpdater.on('update-downloaded', (info) => {
-    broadcastEvent('workspace:update:event', {
+    broadcastEvent('janus:update:event', {
       kind: 'downloaded',
       version: info?.version,
     });
@@ -454,7 +454,7 @@ const DEFAULT_UPDATE_FEED_URL =
 const runUpdateCheck = async (input) => {
   const feedUrl =
     input?.feedUrl ||
-    process.env.WORKSPACE_UPDATE_FEED_URL ||
+    process.env.JANUS_UPDATE_FEED_URL ||
     DEFAULT_UPDATE_FEED_URL;
   const checker = createUpdateChecker({
     feedUrl,
@@ -464,7 +464,7 @@ const runUpdateCheck = async (input) => {
   try {
     const info = await checker.check();
     lastUpdateInfo = info;
-    broadcastEvent('workspace:update:event', {
+    broadcastEvent('janus:update:event', {
       kind: 'check-result',
       info,
     });
@@ -479,11 +479,11 @@ const runUpdateCheck = async (input) => {
 
 const createRuntime = async () => {
   const repoRoot =
-    process.env.WORKSPACE_REPO_ROOT || path.join(__dirname, '..', '..', '..');
+    process.env.JANUS_REPO_ROOT || path.join(__dirname, '..', '..', '..');
 
-  loadWorkspaceEnv(repoRoot);
+  loadJanusEnv(repoRoot);
 
-  return createWorkspaceRuntime({
+  return createJanusRuntime({
     mode: isDev ? 'development' : 'production',
     repoRoot,
     userDataPath: app.getPath('userData'),
@@ -514,7 +514,7 @@ const createRuntime = async () => {
         logger,
         store: whatsappStore,
         onEvent: (event) => {
-          broadcastEvent('workspace:whatsapp:event', event);
+          broadcastEvent('janus:whatsapp:event', event);
         },
       });
 

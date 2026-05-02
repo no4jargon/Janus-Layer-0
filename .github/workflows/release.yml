@@ -60,9 +60,9 @@ jobs:
           # electron-builder reads GH_TOKEN; the workflow's auto-injected
           # GITHUB_TOKEN already has `contents: write` from the permissions block.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WORKSPACE_RELEASE: '1'
-          WORKSPACE_PUBLISH: '1'
-          WORKSPACE_RELEASE_CHANNEL: ${{ inputs.channel || 'beta' }}
+          JANUS_RELEASE: '1'
+          JANUS_PUBLISH: '1'
+          JANUS_RELEASE_CHANNEL: ${{ inputs.channel || 'beta' }}
           MIN_SUPPORTED_VERSION: ${{ inputs.min_supported_version }}
         run: pnpm --filter @janus/desktop release
 

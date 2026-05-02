@@ -59,7 +59,7 @@ The renderer mirrors the demo prototype's UX 1:1: 3-pane layout (sidebar with Wh
 - [x] WhatsApp connector on top of `baileys` (multi-file auth state, QR streaming, reconnect with backoff, mirror events)
 - [x] WhatsApp send outbox pipeline (`createWhatsAppSendService`)
 - [x] DB migrations: `001_init`, `002_email_mirror`, `003_whatsapp_mirror`, `004_wa_outbox`, `005_clusters_and_ai`
-- [x] Attachment download UX (Electron save dialog, IPC at `workspace:gmail:download-attachment`)
+- [x] Attachment download UX (Electron save dialog, IPC at `janus:gmail:download-attachment`)
 - [x] Compose/reply UX for Gmail (toggle for new vs reply mode, To/Cc/Subject inputs)
 - [x] Compose UX for WhatsApp (Enter-to-send)
 - [x] Live event subscriptions for sync.started/completed/failed and WhatsApp QR/connection/message events
@@ -77,13 +77,13 @@ The renderer mirrors the demo prototype's UX 1:1: 3-pane layout (sidebar with Wh
 - [x] Cluster rename / recolor / delete via right-click context menu in the Clusters tab
 
 ### Phase 4 completed
-- [x] Diagnostics export IPC (`workspace:diagnostics:export`) producing a sanitized JSON bundle (app + paths + migrations + connector states + log tail + backup files)
-- [x] Update checker (`createUpdateChecker` in `@janus/core`) with version compare, optional vs required modes; defaults to the GitHub Releases `latest.json` for this repo, overridable via `WORKSPACE_UPDATE_FEED_URL`
-- [x] **Distribution model: unsigned builds via GitHub Releases.** Required + optional update UI both link to the GitHub release page in the system browser; users manually download the new installer and install it over the running app. No in-app auto-download / quit-and-install (unsigned macOS binaries can't self-replace via Gatekeeper). The `electron-updater` wiring + IPCs (`workspace:update:download` / `workspace:update:install`) are kept in place behind feature flags so they can be re-enabled if/when builds are signed.
+- [x] Diagnostics export IPC (`janus:diagnostics:export`) producing a sanitized JSON bundle (app + paths + migrations + connector states + log tail + backup files)
+- [x] Update checker (`createUpdateChecker` in `@janus/core`) with version compare, optional vs required modes; defaults to the GitHub Releases `latest.json` for this repo, overridable via `JANUS_UPDATE_FEED_URL`
+- [x] **Distribution model: unsigned builds via GitHub Releases.** Required + optional update UI both link to the GitHub release page in the system browser; users manually download the new installer and install it over the running app. No in-app auto-download / quit-and-install (unsigned macOS binaries can't self-replace via Gatekeeper). The `electron-updater` wiring + IPCs (`janus:update:download` / `janus:update:install`) are kept in place behind feature flags so they can be re-enabled if/when builds are signed.
 - [x] Required-update enforcement screen — full-window, blocks workspace, **default behavior on every release** (forces every prior version to update). Opt out per release with `MIN_SUPPORTED_VERSION` set below the new version when a release should not block existing users.
 - [x] Optional-update banner in the sidebar (only fires when `MIN_SUPPORTED_VERSION` is opted out below `latestVersion`); links to GitHub release page; dismissable.
-- [x] electron-builder release config (mac dmg + zip, win nsis, linux AppImage) with `provider: github` for `no4jargon/Janus-Layer-0`. `pnpm release:desktop` toggles between unsigned-dir (default) and unsigned-release-publish modes via `WORKSPACE_RELEASE=1`. `CSC_*` / `APPLE_*` signing env vars are still wired so signing can be turned on later without code changes.
-- [x] Update artifact hosting: GitHub Releases. `apps/desktop/electron/package.js` writes `dist/latest.json` per release (with `MIN_SUPPORTED_VERSION` defaulting to the new version → forces every prior build) and uploads it via `gh release upload` when `WORKSPACE_PUBLISH=1`.
+- [x] electron-builder release config (mac dmg + zip, win nsis, linux AppImage) with `provider: github` for `no4jargon/Janus-Layer-0`. `pnpm release:desktop` toggles between unsigned-dir (default) and unsigned-release-publish modes via `JANUS_RELEASE=1`. `CSC_*` / `APPLE_*` signing env vars are still wired so signing can be turned on later without code changes.
+- [x] Update artifact hosting: GitHub Releases. `apps/desktop/electron/package.js` writes `dist/latest.json` per release (with `MIN_SUPPORTED_VERSION` defaulting to the new version → forces every prior build) and uploads it via `gh release upload` when `JANUS_PUBLISH=1`.
 - [x] First draft release (`v0.1.0`) verified end-to-end on GitHub: `latest.json` + `latest-mac.yml` + 4 installers (arm64 + x64 dmg/zip) + 4 blockmaps uploaded as a draft.
 - [x] Migration testing harness (`scripts/test-migrations.js`) — fresh bootstrap, idempotency, v1-baseline upgrade with row preservation; runs via `pnpm test:migrations`
 - [x] CI workflow: `.github/workflows/ci.yml` runs install + build + typecheck + migrations test + verify on every PR

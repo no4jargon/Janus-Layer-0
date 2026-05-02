@@ -80,7 +80,7 @@ Goal: every test below should be exercised on at least one macOS install **and**
 
 The app is distributed unsigned, so there is no in-app auto-update — the Required Update screen and optional banner both link to the GitHub Releases page for manual download.
 
-By default the app reads the JSON feed from this repo's GitHub Releases (`https://github.com/no4jargon/Janus-Layer-0/releases/latest/download/latest.json`). To test against a staged feed without cutting a real release, host a `latest.json` somewhere reachable and launch the app with `WORKSPACE_UPDATE_FEED_URL=<staged-url>`.
+By default the app reads the JSON feed from this repo's GitHub Releases (`https://github.com/no4jargon/Janus-Layer-0/releases/latest/download/latest.json`). To test against a staged feed without cutting a real release, host a `latest.json` somewhere reachable and launch the app with `JANUS_UPDATE_FEED_URL=<staged-url>`.
 
 The default release flow forces every prior version to update (see `docs/RELEASE.md`). Section 6 covers both the forced and optional paths.
 

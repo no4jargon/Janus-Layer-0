@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 type Snapshot = Awaited<
-  ReturnType<NonNullable<typeof window.workspaceApi>['getRuntimeState']>
+  ReturnType<NonNullable<typeof window.janusApi>['getRuntimeState']>
 >;
 
 type Props = {
@@ -38,9 +38,9 @@ export const SettingsModal = ({ snapshot, onClose }: Props) => {
   }, [snapshot.settings.ollamaBaseUrl, snapshot.settings.ollamaModel]);
 
   const cycleTheme = async () => {
-    if (!window.workspaceApi) return;
+    if (!window.janusApi) return;
     try {
-      await window.workspaceApi.updateSettings({
+      await window.janusApi.updateSettings({
         theme: themeNext(snapshot.settings.theme),
       });
     } catch (err) {
@@ -49,12 +49,12 @@ export const SettingsModal = ({ snapshot, onClose }: Props) => {
   };
 
   const exportDiagnostics = async () => {
-    if (!window.workspaceApi) return;
+    if (!window.janusApi) return;
     setDiagnosticsBusy(true);
     setDiagnosticsResult(null);
     setError(null);
     try {
-      const result = await window.workspaceApi.diagnostics.export();
+      const result = await window.janusApi.diagnostics.export();
       if (result.saved) {
         setDiagnosticsResult(`Saved to ${result.savedPath}`);
       } else {
@@ -68,12 +68,12 @@ export const SettingsModal = ({ snapshot, onClose }: Props) => {
   };
 
   const checkForUpdates = async () => {
-    if (!window.workspaceApi) return;
+    if (!window.janusApi) return;
     setUpdateBusy(true);
     setUpdateResult(null);
     setError(null);
     try {
-      const result = await window.workspaceApi.update.check();
+      const result = await window.janusApi.update.check();
       if (result.kind === 'unconfigured') {
         setUpdateResult(result.message);
       } else if (result.kind === 'error') {
@@ -99,11 +99,11 @@ export const SettingsModal = ({ snapshot, onClose }: Props) => {
   };
 
   const saveOllama = async () => {
-    if (!window.workspaceApi) return;
+    if (!window.janusApi) return;
     setSaving(true);
     setError(null);
     try {
-      await window.workspaceApi.updateSettings({
+      await window.janusApi.updateSettings({
         ollamaBaseUrl: ollamaBaseUrl.trim() || null,
         ollamaModel: ollamaModel.trim() || null,
       });
@@ -248,7 +248,7 @@ export const SettingsModal = ({ snapshot, onClose }: Props) => {
             <h4>Updates</h4>
             <p className="settings-hint">
               Checks the GitHub Releases update feed (override with{' '}
-              <code>WORKSPACE_UPDATE_FEED_URL</code>). Beta channel only for
+              <code>JANUS_UPDATE_FEED_URL</code>). Beta channel only for
               now. Required updates block usage if the local version is below
               the minimum supported version.
             </p>
@@ -281,11 +281,11 @@ export const OnboardingModal = ({ onDone }: OnboardingProps) => {
   const [error, setError] = useState<string | null>(null);
 
   const finish = async () => {
-    if (!window.workspaceApi) return;
+    if (!window.janusApi) return;
     setBusy(true);
     setError(null);
     try {
-      await window.workspaceApi.updateSettings({ onboardingCompleted: true });
+      await window.janusApi.updateSettings({ onboardingCompleted: true });
       onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

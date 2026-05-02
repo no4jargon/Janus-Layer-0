@@ -21,7 +21,7 @@ export type ConnectorSnapshot = {
   metadata: ConnectorMetadata;
 };
 
-export interface WorkspaceConnector {
+export interface JanusConnector {
   readonly kind: ConnectorKind;
   bootstrap?(): Promise<{
     connected: boolean;
@@ -56,7 +56,7 @@ const normalizeStatus = (value: string): ConnectorStatus => {
 export type ConnectorRuntimeInput = {
   store: ConnectorStateStore;
   logger: Logger;
-  connectors: Partial<Record<ConnectorKind, WorkspaceConnector>>;
+  connectors: Partial<Record<ConnectorKind, JanusConnector>>;
 };
 
 export const createConnectorRuntime = (input: ConnectorRuntimeInput) => {
@@ -120,7 +120,7 @@ export const createConnectorRuntime = (input: ConnectorRuntimeInput) => {
     return next;
   };
 
-  const requireConnector = (kind: ConnectorKind): WorkspaceConnector => {
+  const requireConnector = (kind: ConnectorKind): JanusConnector => {
     const connector = input.connectors[kind];
     if (!connector) {
       throw new Error(`Connector not registered: ${kind}`);

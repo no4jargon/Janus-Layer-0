@@ -64,7 +64,7 @@ const child = spawn(electron, ['./electron/main.js'], {
   env: {
     ...process.env,
     UI_DEV_URL: 'http://127.0.0.1:5173',
-    WORKSPACE_REPO_ROOT: repoRoot,
+    JANUS_REPO_ROOT: repoRoot,
     NODE_ENV: 'development',
   },
 });

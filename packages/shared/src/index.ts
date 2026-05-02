@@ -20,7 +20,7 @@ export type ConnectorSnapshot = {
   metadata?: Record<string, unknown> | null;
 };
 
-export type WorkspaceSettings = {
+export type JanusSettings = {
   onboardingCompleted: boolean;
   theme: 'system' | 'light' | 'dark';
 };
@@ -34,6 +34,6 @@ export type RuntimeSnapshot = {
     dbPath: string;
     logsDir: string;
   };
-  settings: WorkspaceSettings;
+  settings: JanusSettings;
   connectors: ConnectorSnapshot[];
 };

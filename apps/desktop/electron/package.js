@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const desktopRoot = path.join(__dirname, '..');
 
-const isRelease = process.env.WORKSPACE_RELEASE === '1';
-const isPublish = process.env.WORKSPACE_PUBLISH === '1';
+const isRelease = process.env.JANUS_RELEASE === '1';
+const isPublish = process.env.JANUS_PUBLISH === '1';
 
 execSync('node ./electron/build.js', {
   cwd: desktopRoot,
@@ -43,7 +43,7 @@ if (isRelease) {
   const version = pkg.version;
   const tag = `v${version}`;
   const minSupported = process.env.MIN_SUPPORTED_VERSION || version;
-  const channel = process.env.WORKSPACE_RELEASE_CHANNEL || 'beta';
+  const channel = process.env.JANUS_RELEASE_CHANNEL || 'beta';
   const repoSlug = 'no4jargon/Janus-Layer-0';
 
   const latest = {

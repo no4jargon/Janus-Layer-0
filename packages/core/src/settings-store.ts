@@ -2,14 +2,14 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Logger } from './logger.js';
 
-export type WorkspaceSettings = {
+export type JanusSettings = {
   onboardingCompleted: boolean;
   theme: 'system' | 'light' | 'dark';
   ollamaBaseUrl: string | null;
   ollamaModel: string | null;
 };
 
-const DEFAULT_SETTINGS: WorkspaceSettings = {
+const DEFAULT_SETTINGS: JanusSettings = {
   onboardingCompleted: false,
   theme: 'system',
   ollamaBaseUrl: null,
@@ -19,7 +19,7 @@ const DEFAULT_SETTINGS: WorkspaceSettings = {
 export const createSettingsStore = (input: { baseDir: string; logger: Logger }) => {
   const settingsPath = path.join(input.baseDir, 'settings.json');
 
-  const read = (): WorkspaceSettings => {
+  const read = (): JanusSettings => {
     if (!existsSync(settingsPath)) {
       writeFileSync(settingsPath, JSON.stringify(DEFAULT_SETTINGS, null, 2));
       return { ...DEFAULT_SETTINGS };
@@ -36,7 +36,7 @@ export const createSettingsStore = (input: { baseDir: string; logger: Logger }) 
     }
   };
 
-  const write = (patch: Partial<WorkspaceSettings>): WorkspaceSettings => {
+  const write = (patch: Partial<JanusSettings>): JanusSettings => {
     const current = read();
     const next = { ...current, ...patch };
     writeFileSync(settingsPath, JSON.stringify(next, null, 2));

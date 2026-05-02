@@ -24,7 +24,7 @@ type SerializedMigrationFailure = {
   backupPath: string | null;
 };
 
-type WorkspaceRuntimeSnapshot = {
+type JanusRuntimeSnapshot = {
   appVersion: string;
   mode: RuntimeMode;
   phase: string;
@@ -180,24 +180,24 @@ declare global {
     | { kind: 'error'; message: string };
 
   interface Window {
-    workspaceMeta?: {
+    janusMeta?: {
       platform: string;
       versions: Record<string, string>;
     };
-    workspaceApi?: {
-      getRuntimeState: () => Promise<WorkspaceRuntimeSnapshot>;
+    janusApi?: {
+      getRuntimeState: () => Promise<JanusRuntimeSnapshot>;
       updateSettings: (
-        patch: Partial<WorkspaceRuntimeSnapshot['settings']>,
-      ) => Promise<WorkspaceRuntimeSnapshot>;
+        patch: Partial<JanusRuntimeSnapshot['settings']>,
+      ) => Promise<JanusRuntimeSnapshot>;
       connectConnector: (
         connector: ConnectorKind,
-      ) => Promise<WorkspaceRuntimeSnapshot>;
+      ) => Promise<JanusRuntimeSnapshot>;
       disconnectConnector: (
         connector: ConnectorKind,
-      ) => Promise<WorkspaceRuntimeSnapshot>;
+      ) => Promise<JanusRuntimeSnapshot>;
       syncConnector: (
         connector: ConnectorKind,
-      ) => Promise<WorkspaceRuntimeSnapshot>;
+      ) => Promise<JanusRuntimeSnapshot>;
       gmail: {
         listThreads: () => Promise<EmailThreadSummary[]>;
         getThread: (
@@ -296,7 +296,7 @@ declare global {
         listOutputs: (clusterId: string) => Promise<unknown[]>;
       };
       migration: {
-        retry: () => Promise<WorkspaceRuntimeSnapshot>;
+        retry: () => Promise<JanusRuntimeSnapshot>;
       };
       diagnostics: {
         export: () => Promise<{ saved: boolean; savedPath?: string }>;
@@ -314,7 +314,7 @@ declare global {
       };
       events: {
         onRuntimeSnapshot: (
-          handler: (snapshot: WorkspaceRuntimeSnapshot) => void,
+          handler: (snapshot: JanusRuntimeSnapshot) => void,
         ) => () => void;
         onWhatsAppEvent: (handler: (event: WaEvent) => void) => () => void;
         onConnectorEvent: (

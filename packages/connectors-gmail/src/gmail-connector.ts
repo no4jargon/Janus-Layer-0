@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { Logger, WorkspaceConnector } from '@janus/core';
+import type { Logger, JanusConnector } from '@janus/core';
 import type { EmailStore } from '@janus/db';
 import {
   authedFetch,
@@ -60,7 +60,7 @@ export type GmailSyncSummary = {
   messages: number;
 };
 
-export type GmailConnector = WorkspaceConnector & {
+export type GmailConnector = JanusConnector & {
   readonly tokenPath: string;
   getStatus(): GmailRuntimeStatus;
   getAttachmentContent(
@@ -345,7 +345,7 @@ export const createGmailConnector = (
     }
   };
 
-  const bootstrap: WorkspaceConnector['bootstrap'] = async () => {
+  const bootstrap: JanusConnector['bootstrap'] = async () => {
     const profile = getStoredProfile();
     const token = getStoredToken();
     const account = options.emailStore.getEmailAccount('local-user', 'gmail');
@@ -367,7 +367,7 @@ export const createGmailConnector = (
     return { connected: false };
   };
 
-  const connect: WorkspaceConnector['connect'] = async () => {
+  const connect: JanusConnector['connect'] = async () => {
     const config = parseOauthConfig();
     const token = await runDesktopOAuth({
       config,
@@ -409,7 +409,7 @@ export const createGmailConnector = (
     return { metadata: { emailAddress } };
   };
 
-  const disconnect: WorkspaceConnector['disconnect'] = async () => {
+  const disconnect: JanusConnector['disconnect'] = async () => {
     if (existsSync(tokenPath)) rmSync(tokenPath, { force: true });
     if (existsSync(profilePath)) rmSync(profilePath, { force: true });
 
@@ -428,7 +428,7 @@ export const createGmailConnector = (
     };
   };
 
-  const syncWrapped: WorkspaceConnector['sync'] = async () => {
+  const syncWrapped: JanusConnector['sync'] = async () => {
     const summary = await sync();
     return {
       lastSyncedAt: nowIso(),

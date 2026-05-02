@@ -18,7 +18,7 @@ import type {
   WAMessageUpdate,
   WASocket,
 } from 'baileys';
-import type { Logger as CoreLogger, WorkspaceConnector } from '@janus/core';
+import type { Logger as CoreLogger, JanusConnector } from '@janus/core';
 import type { WhatsAppStore } from '@janus/db';
 import {
   buildMessageRow,
@@ -50,7 +50,7 @@ export type WhatsAppRuntimeStatus = {
   loggedOut: boolean;
 };
 
-export type WhatsAppConnector = WorkspaceConnector & {
+export type WhatsAppConnector = JanusConnector & {
   getStatus(): WhatsAppRuntimeStatus;
   getActiveSocket(): WASocket | null;
 };
@@ -368,7 +368,7 @@ export const createWhatsAppConnector = (
 
   const isConnected = () => activeSock !== null && pairedAt !== null && !loggedOut;
 
-  const bootstrap: WorkspaceConnector['bootstrap'] = async () => {
+  const bootstrap: JanusConnector['bootstrap'] = async () => {
     if (!existsSync(sessionDir)) {
       return { connected: false };
     }
@@ -386,7 +386,7 @@ export const createWhatsAppConnector = (
     }
   };
 
-  const connect: WorkspaceConnector['connect'] = async () => {
+  const connect: JanusConnector['connect'] = async () => {
     cancelReconnect();
     teardownSocket();
     pairedAt = null;
@@ -422,7 +422,7 @@ export const createWhatsAppConnector = (
     };
   };
 
-  const disconnect: WorkspaceConnector['disconnect'] = async () => {
+  const disconnect: JanusConnector['disconnect'] = async () => {
     cancelReconnect();
     if (activeSock) {
       try {
@@ -441,7 +441,7 @@ export const createWhatsAppConnector = (
     lastQr = null;
   };
 
-  const sync: WorkspaceConnector['sync'] = async () => {
+  const sync: JanusConnector['sync'] = async () => {
     if (!isConnected()) {
       throw new Error('WhatsApp not connected');
     }

@@ -9,7 +9,7 @@ import {
   type ConnectorKind,
   type ConnectorRuntime,
   type ConnectorSnapshot,
-  type WorkspaceConnector,
+  type JanusConnector,
 } from './connector-runtime.js';
 import {
   ensureAppDataPaths,
@@ -21,7 +21,7 @@ import { createFileLogger, type Logger } from './logger.js';
 import {
   createSettingsStore,
   type SettingsStore,
-  type WorkspaceSettings,
+  type JanusSettings,
 } from './settings-store.js';
 
 export type CreateRuntimeInput = {
@@ -31,7 +31,7 @@ export type CreateRuntimeInput = {
   migrationsDir: string;
   appVersion: string;
   buildConnectors: (context: BuildConnectorsContext) => Partial<
-    Record<ConnectorKind, WorkspaceConnector>
+    Record<ConnectorKind, JanusConnector>
   >;
 };
 
@@ -50,7 +50,7 @@ export type RuntimeSnapshot = {
     dbPath: string;
     logsDir: string;
   };
-  settings: WorkspaceSettings;
+  settings: JanusSettings;
   connectors: ConnectorSnapshot[];
   migrationFailure: SerializedMigrationFailure | null;
 };
@@ -61,7 +61,7 @@ export type SerializedMigrationFailure = {
   backupPath: string | null;
 };
 
-export type WorkspaceRuntime = {
+export type JanusRuntime = {
   logger: Logger;
   paths: AppDataPaths;
   db: Database;
@@ -85,9 +85,9 @@ const serializeMigrationFailure = (
       }
     : null;
 
-export const createWorkspaceRuntime = (
+export const createJanusRuntime = (
   input: CreateRuntimeInput,
-): WorkspaceRuntime => {
+): JanusRuntime => {
   const paths = resolveAppDataPaths({
     mode: input.mode,
     repoRoot: input.repoRoot,

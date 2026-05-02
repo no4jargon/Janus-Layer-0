@@ -29,7 +29,7 @@ import { buildClientRequestId } from './lib/workflow-output';
 import { useConnectorEvents, useWhatsAppEvents } from './lib/use-runtime';
 
 type Snapshot = Awaited<
-  ReturnType<NonNullable<typeof window.workspaceApi>['getRuntimeState']>
+  ReturnType<NonNullable<typeof window.janusApi>['getRuntimeState']>
 >;
 
 type WaThreadMessage = {
@@ -283,35 +283,35 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
   }, [connectorSummary.whatsappStatus]);
 
   const refreshClusters = useCallback(async () => {
-    if (!window.workspaceApi) return;
-    const result = await window.workspaceApi.cluster.list();
+    if (!window.janusApi) return;
+    const result = await window.janusApi.cluster.list();
     setClusters(result.clusters);
     setClusterMap(result.clusterMap);
   }, []);
 
   const loadWhatsappChats = useCallback(async () => {
-    if (!window.workspaceApi) return;
-    const chats = await window.workspaceApi.whatsapp.listChats();
+    if (!window.janusApi) return;
+    const chats = await window.janusApi.whatsapp.listChats();
     setWhatsappChats(chats.map(toListItemWhatsapp));
   }, []);
 
   const loadEmailThreads = useCallback(async () => {
-    if (!window.workspaceApi) return;
-    const threads = await window.workspaceApi.gmail.listThreads();
+    if (!window.janusApi) return;
+    const threads = await window.janusApi.gmail.listThreads();
     setEmailThreads(threads.map(toListItemEmail));
   }, []);
 
   const loadWhatsappThread = useCallback(async (jid: string) => {
-    if (!window.workspaceApi) return;
-    const messages = await window.workspaceApi.whatsapp.getChat(jid);
+    if (!window.janusApi) return;
+    const messages = await window.janusApi.whatsapp.getChat(jid);
     setThreadMessages(
       messages.map((message) => ({ ...message, __kind: 'whatsapp' }) as WaThreadMessage),
     );
   }, []);
 
   const loadEmailThread = useCallback(async (threadId: string) => {
-    if (!window.workspaceApi) return;
-    const payload = await window.workspaceApi.gmail.getThread(threadId);
+    if (!window.janusApi) return;
+    const payload = await window.janusApi.gmail.getThread(threadId);
     if (!payload) {
       setThreadMessages([]);
       return;
@@ -368,7 +368,7 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
 
   // Subscribe to WhatsApp events for live updates
   const onWaEvent = useCallback(
-    (event: Parameters<NonNullable<typeof window.workspaceApi>['events']['onWhatsAppEvent']>[0] extends (e: infer T) => void ? T : never) => {
+    (event: Parameters<NonNullable<typeof window.janusApi>['events']['onWhatsAppEvent']>[0] extends (e: infer T) => void ? T : never) => {
       if (event.type === 'qr') {
         setWaQr(event.payload.qr);
         setWaConnectionText('Scan QR to login');
@@ -448,7 +448,7 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
   );
 
   const onCreateCluster = useCallback(async () => {
-    if (!selectedItems.size || !window.workspaceApi) return;
+    if (!selectedItems.size || !window.janusApi) return;
     const rawName = window.prompt('Cluster name?');
     if (rawName === null) return;
     const name = rawName.trim();
@@ -471,7 +471,7 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
         (entry): entry is { source: 'gmail' | 'whatsapp'; sourceRef: string } => !!entry,
       );
 
-    await window.workspaceApi.cluster.create({ name, color: colorId, members });
+    await window.janusApi.cluster.create({ name, color: colorId, members });
     setSelectedItems(new Set());
     lastAnchorIndexRef.current = null;
     await refreshClusters();
@@ -479,12 +479,12 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
 
   const onRenameCluster = useCallback(
     async (cluster: ClusterRecord) => {
-      if (!window.workspaceApi) return;
+      if (!window.janusApi) return;
       const next = window.prompt('Rename cluster', cluster.name);
       if (next === null) return;
       const trimmed = next.trim();
       if (!trimmed) return;
-      await window.workspaceApi.cluster.rename({
+      await window.janusApi.cluster.rename({
         id: cluster.id,
         name: trimmed,
       });
@@ -495,8 +495,8 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
 
   const onRecolorCluster = useCallback(
     async (cluster: ClusterRecord, color: string) => {
-      if (!window.workspaceApi) return;
-      await window.workspaceApi.cluster.rename({
+      if (!window.janusApi) return;
+      await window.janusApi.cluster.rename({
         id: cluster.id,
         name: cluster.name,
         color,
@@ -508,20 +508,20 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
 
   const onDeleteCluster = useCallback(
     async (cluster: ClusterRecord) => {
-      if (!window.workspaceApi) return;
+      if (!window.janusApi) return;
       if (!window.confirm(`Delete cluster "${cluster.name}"? Members will be unassigned.`)) {
         return;
       }
-      await window.workspaceApi.cluster.remove(cluster.id);
+      await window.janusApi.cluster.remove(cluster.id);
       await refreshClusters();
     },
     [refreshClusters],
   );
 
   const clearAllClusters = useCallback(async () => {
-    if (!window.workspaceApi) return;
+    if (!window.janusApi) return;
     if (!window.confirm('Clear all clusters?')) return;
-    await window.workspaceApi.cluster.clearAll();
+    await window.janusApi.cluster.clearAll();
     await refreshClusters();
     window.alert('All clusters cleared.');
   }, [refreshClusters]);
@@ -530,11 +530,11 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
     if (!activeThread || activeThread.sourceType !== 'whatsapp_chat') return;
     const text = waInput.trim();
     if (!text) return;
-    if (!window.workspaceApi) return;
+    if (!window.janusApi) return;
     setIsWaSending(true);
     setWaSendingStatus({ text: 'Sending...', isError: false });
     try {
-      await window.workspaceApi.whatsapp.sendText({
+      await window.janusApi.whatsapp.sendText({
         jid: activeThread.id,
         text,
         clientRequestId: buildClientRequestId('wa'),
@@ -556,12 +556,12 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
   const sendEmailMessage = useCallback(async () => {
     const textBody = emailBody.trim();
     if (!textBody) return;
-    if (!window.workspaceApi) return;
+    if (!window.janusApi) return;
     const isReplyMode = !emailNewMode;
     setIsEmailSending(true);
     setEmailSendingStatus({ text: 'Sending...', isError: false });
     try {
-      await window.workspaceApi.gmail.sendEmail({
+      await window.janusApi.gmail.sendEmail({
         clientRequestId: buildClientRequestId('email'),
         threadId:
           isReplyMode && activeThread?.sourceType === 'email_thread'
@@ -604,9 +604,9 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
   ]);
 
   const onConnectGmail = useCallback(async () => {
-    if (!window.workspaceApi) return;
+    if (!window.janusApi) return;
     try {
-      await window.workspaceApi.connectConnector('gmail');
+      await window.janusApi.connectConnector('gmail');
     } catch (error) {
       setEmailSendingStatus({
         text: `Connect failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -616,8 +616,8 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
   }, []);
 
   const onDisconnectGmail = useCallback(async () => {
-    if (!window.workspaceApi) return;
-    await window.workspaceApi.disconnectConnector('gmail');
+    if (!window.janusApi) return;
+    await window.janusApi.disconnectConnector('gmail');
     setEmailThreads([]);
     if (activeThread?.sourceType === 'email_thread') {
       setActiveThread(null);
@@ -627,15 +627,15 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
   }, [activeThread]);
 
   const onSyncGmail = useCallback(async () => {
-    if (!window.workspaceApi) return;
-    await window.workspaceApi.syncConnector('gmail');
+    if (!window.janusApi) return;
+    await window.janusApi.syncConnector('gmail');
     await loadEmailThreads();
   }, [loadEmailThreads]);
 
   const onConnectWhatsapp = useCallback(async () => {
-    if (!window.workspaceApi) return;
+    if (!window.janusApi) return;
     try {
-      await window.workspaceApi.connectConnector('whatsapp');
+      await window.janusApi.connectConnector('whatsapp');
     } catch (error) {
       setWaSendingStatus({
         text: `Connect failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -645,8 +645,8 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
   }, []);
 
   const onDisconnectWhatsapp = useCallback(async () => {
-    if (!window.workspaceApi) return;
-    await window.workspaceApi.disconnectConnector('whatsapp');
+    if (!window.janusApi) return;
+    await window.janusApi.disconnectConnector('whatsapp');
     setWhatsappChats([]);
     if (activeThread?.sourceType === 'whatsapp_chat') {
       setActiveThread(null);
@@ -872,8 +872,8 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
                 className="attachment-pill"
                 onClick={async (event) => {
                   event.stopPropagation();
-                  if (!window.workspaceApi) return;
-                  await window.workspaceApi.gmail.downloadAttachment(attachment.id);
+                  if (!window.janusApi) return;
+                  await window.janusApi.gmail.downloadAttachment(attachment.id);
                 }}
               >
                 📎 {attachment.filename || 'attachment'}

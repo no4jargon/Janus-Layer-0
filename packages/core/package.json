@@ -19,7 +19,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@janus/db": "workspace:*",
-    "@janus/shared": "workspace:*"
+    "@janus/db": "janus:*",
+    "@janus/shared": "janus:*"
   }
 }

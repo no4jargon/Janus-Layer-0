@@ -20,9 +20,9 @@
   },
   "dependencies": {
     "@hapi/boom": "^10.0.1",
-    "@janus/core": "workspace:*",
-    "@janus/db": "workspace:*",
-    "@janus/shared": "workspace:*",
+    "@janus/core": "janus:*",
+    "@janus/db": "janus:*",
+    "@janus/shared": "janus:*",
     "baileys": "^7.0.0-rc.9",
     "pino": "^9.13.1"
   }

@@ -36,7 +36,7 @@ pnpm build              # builds all packages (TS -> dist) and the renderer
 pnpm dev                # starts Electron + Vite (auto-builds packages first)
 pnpm dev:ui             # renderer-only loop
 pnpm package:desktop    # produces an unsigned dir Electron build under apps/desktop/dist
-pnpm release:desktop    # signed installer build (needs WORKSPACE_RELEASE=1, CSC_*/APPLE_* env)
+pnpm release:desktop    # signed installer build (needs JANUS_RELEASE=1, CSC_*/APPLE_* env)
 pnpm verify:data-paths  # smoke-tests dev/prod data paths + migrations
 pnpm test:migrations    # runs the migration test harness (fresh + idempotent + v1-upgrade)
 pnpm typecheck          # typecheck all packages
