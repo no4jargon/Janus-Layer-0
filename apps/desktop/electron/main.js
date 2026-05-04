@@ -41,6 +41,13 @@ let whatsappSendService = null;
 let workflowExtractor = null;
 let updaterConfigured = false;
 let lastUpdateInfo = null;
+let updatePollTimer = null;
+
+// How often to poll the update feed while the app is running.
+// Override with JANUS_UPDATE_POLL_MS for testing.
+const UPDATE_POLL_INTERVAL_MS = Number(
+  process.env.JANUS_UPDATE_POLL_MS || 60 * 60 * 1000,
+);
 
 const broadcastEvent = (channel, payload) => {
   if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -600,7 +607,32 @@ const bootstrap = async () => {
         error: String(error),
       });
     });
+    startUpdatePolling();
   }
+};
+
+const startUpdatePolling = () => {
+  if (updatePollTimer) return;
+  if (!Number.isFinite(UPDATE_POLL_INTERVAL_MS) || UPDATE_POLL_INTERVAL_MS <= 0) {
+    return;
+  }
+  updatePollTimer = setInterval(() => {
+    runUpdateCheck().catch((error) => {
+      runtime?.logger?.warn?.('periodic update check failed', {
+        error: String(error),
+      });
+    });
+  }, UPDATE_POLL_INTERVAL_MS);
+  // Don't keep the event loop alive just for polling.
+  if (typeof updatePollTimer.unref === 'function') {
+    updatePollTimer.unref();
+  }
+};
+
+const stopUpdatePolling = () => {
+  if (!updatePollTimer) return;
+  clearInterval(updatePollTimer);
+  updatePollTimer = null;
 };
 
 const gotLock = app.requestSingleInstanceLock();
@@ -631,6 +663,7 @@ if (!gotLock) {
   });
 
   app.on('before-quit', () => {
+    stopUpdatePolling();
     runtime?.close();
     workflowExtractor?.dispose().catch(() => {
       /* dispose is best-effort */
