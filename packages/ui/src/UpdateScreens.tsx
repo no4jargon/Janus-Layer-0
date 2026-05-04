@@ -56,6 +56,24 @@ type OptionalProps = {
   onDismiss: () => void;
 };
 
+type PrivacyBannerProps = {
+  onDismiss: () => void;
+};
+
+export const PrivacyBanner = ({ onDismiss }: PrivacyBannerProps) => {
+  return (
+    <div className="privacy-banner">
+      <div>
+        <strong>There&rsquo;s no servers in this application.</strong>{' '}
+        All data and models never leave your device.
+      </div>
+      <div className="privacy-banner-actions">
+        <button onClick={onDismiss}>Got it</button>
+      </div>
+    </div>
+  );
+};
+
 export const OptionalUpdateBanner = ({ info, onDismiss }: OptionalProps) => {
   return (
     <div className="optional-update-banner">

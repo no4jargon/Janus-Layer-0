@@ -1264,3 +1264,32 @@ body {
 	opacity: 0.6;
 	cursor: not-allowed;
 }
+
+/* privacy banner inside sidebar */
+.privacy-banner {
+	margin: 8px 10px 0;
+	padding: 8px 10px;
+	font-size: 12px;
+	border: 1px solid #bbf7d0;
+	border-radius: 8px;
+	background: #f0fdf4;
+	color: #14532d;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.privacy-banner-actions {
+	display: flex;
+	gap: 6px;
+}
+
+.privacy-banner-actions button {
+	padding: 5px 8px;
+	border-radius: 6px;
+	border: 1px solid #86efac;
+	background: #fff;
+	color: #14532d;
+	cursor: pointer;
+	font-size: 12px;
+}

@@ -39,6 +39,7 @@ type JanusRuntimeSnapshot = {
     llmModelPath: string | null;
     workStartTime: string | null;
     lastOpenedAt: number | null;
+    privacyBannerDismissed: boolean;
   };
   previousLastOpenedAt: number | null;
   connectors: ConnectorSnapshot[];

@@ -8,7 +8,7 @@ import {
 } from 'react';
 import { AiPanel } from './AiPanel';
 import { OnboardingModal, SettingsModal } from './Settings';
-import { OptionalUpdateBanner } from './UpdateScreens';
+import { OptionalUpdateBanner, PrivacyBanner } from './UpdateScreens';
 import {
   CLUSTER_COLORS,
   clusterDot,
@@ -1028,6 +1028,15 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
             <button onClick={() => void refreshCurrentTab()}>Refresh</button>
           </div>
         </div>
+        {!snapshot.settings.privacyBannerDismissed ? (
+          <PrivacyBanner
+            onDismiss={() => {
+              void window.janusApi?.updateSettings({
+                privacyBannerDismissed: true,
+              });
+            }}
+          />
+        ) : null}
         {updateInfo && updateInfo.kind === 'optional' && !optionalUpdateDismissed ? (
           <OptionalUpdateBanner
             info={updateInfo}

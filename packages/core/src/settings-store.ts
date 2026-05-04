@@ -8,6 +8,7 @@ export type JanusSettings = {
   llmModelPath: string | null;
   workStartTime: string | null;
   lastOpenedAt: number | null;
+  privacyBannerDismissed: boolean;
 };
 
 const DEFAULT_SETTINGS: JanusSettings = {
@@ -16,6 +17,7 @@ const DEFAULT_SETTINGS: JanusSettings = {
   llmModelPath: null,
   workStartTime: null,
   lastOpenedAt: null,
+  privacyBannerDismissed: false,
 };
 
 export const createSettingsStore = (input: { baseDir: string; logger: Logger }) => {
