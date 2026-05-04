@@ -18,11 +18,8 @@ const themeNext = (
 };
 
 export const SettingsModal = ({ snapshot, onClose }: Props) => {
-  const [ollamaBaseUrl, setOllamaBaseUrl] = useState(
-    snapshot.settings.ollamaBaseUrl ?? '',
-  );
-  const [ollamaModel, setOllamaModel] = useState(
-    snapshot.settings.ollamaModel ?? '',
+  const [llmModelPath, setLlmModelPath] = useState(
+    snapshot.settings.llmModelPath ?? '',
   );
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
@@ -33,9 +30,8 @@ export const SettingsModal = ({ snapshot, onClose }: Props) => {
   const [updateResult, setUpdateResult] = useState<string | null>(null);
 
   useEffect(() => {
-    setOllamaBaseUrl(snapshot.settings.ollamaBaseUrl ?? '');
-    setOllamaModel(snapshot.settings.ollamaModel ?? '');
-  }, [snapshot.settings.ollamaBaseUrl, snapshot.settings.ollamaModel]);
+    setLlmModelPath(snapshot.settings.llmModelPath ?? '');
+  }, [snapshot.settings.llmModelPath]);
 
   const cycleTheme = async () => {
     if (!window.janusApi) return;
@@ -98,20 +94,31 @@ export const SettingsModal = ({ snapshot, onClose }: Props) => {
     }
   };
 
-  const saveOllama = async () => {
+  const saveLocalAi = async () => {
     if (!window.janusApi) return;
     setSaving(true);
     setError(null);
     try {
       await window.janusApi.updateSettings({
-        ollamaBaseUrl: ollamaBaseUrl.trim() || null,
-        ollamaModel: ollamaModel.trim() || null,
+        llmModelPath: llmModelPath.trim() || null,
       });
       setSavedAt(new Date().toLocaleTimeString());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const chooseModelFile = async () => {
+    if (!window.janusApi) return;
+    setError(null);
+    try {
+      const result = await window.janusApi.ai.chooseModelFile();
+      if (result.canceled) return;
+      setLlmModelPath(result.path);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -146,32 +153,28 @@ export const SettingsModal = ({ snapshot, onClose }: Props) => {
           </section>
 
           <section className="settings-section">
-            <h4>Local AI (Ollama)</h4>
+            <h4>Local AI (llama.cpp)</h4>
             <p className="settings-hint">
-              Workflow extraction runs against a local Ollama instance. Leave
-              blank to use defaults (<code>http://127.0.0.1:11434</code> /{' '}
-              <code>llama3:8b</code>) or env vars.
+              Workflow extraction runs in-process via llama.cpp. Leave blank
+              to use the bundled default —{' '}
+              <strong>Gemma 4 E4B Instruct</strong> (Q4_K_M, ~5GB) — which
+              is auto-downloaded on first use. Override with a path to your
+              own <code>.gguf</code> if you prefer a different model. The
+              model loads on first use and stays resident until you change
+              it or quit.
             </p>
             <label className="settings-field">
-              <span>Base URL</span>
+              <span>Model file</span>
               <input
                 type="text"
-                placeholder="http://127.0.0.1:11434"
-                value={ollamaBaseUrl}
-                onChange={(event) => setOllamaBaseUrl(event.target.value)}
-              />
-            </label>
-            <label className="settings-field">
-              <span>Model</span>
-              <input
-                type="text"
-                placeholder="llama3:8b"
-                value={ollamaModel}
-                onChange={(event) => setOllamaModel(event.target.value)}
+                placeholder="/path/to/model.gguf"
+                value={llmModelPath}
+                onChange={(event) => setLlmModelPath(event.target.value)}
               />
             </label>
             <div className="settings-row">
-              <button onClick={() => void saveOllama()} disabled={saving}>
+              <button onClick={() => void chooseModelFile()}>Browse…</button>
+              <button onClick={() => void saveLocalAi()} disabled={saving}>
                 {saving ? 'Saving…' : 'Save AI settings'}
               </button>
               {savedAt ? (
@@ -276,16 +279,27 @@ type OnboardingProps = {
   onDone: () => void;
 };
 
+const isValidHHMM = (value: string): boolean =>
+  /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+
 export const OnboardingModal = ({ onDone }: OnboardingProps) => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [workStartTime, setWorkStartTime] = useState('09:00');
 
   const finish = async () => {
     if (!window.janusApi) return;
+    if (!isValidHHMM(workStartTime)) {
+      setError('Enter a valid time in HH:MM format.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      await window.janusApi.updateSettings({ onboardingCompleted: true });
+      await window.janusApi.updateSettings({
+        onboardingCompleted: true,
+        workStartTime,
+      });
       onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -324,6 +338,22 @@ export const OnboardingModal = ({ onDone }: OnboardingProps) => {
               servers.
             </li>
           </ul>
+          <div className="settings-row">
+            <label htmlFor="work-start-time" style={{ flex: 1 }}>
+              When do you start your work each day?
+              <input
+                id="work-start-time"
+                type="time"
+                value={workStartTime}
+                onChange={(event) => setWorkStartTime(event.target.value)}
+                style={{ marginLeft: 8 }}
+              />
+            </label>
+          </div>
+          <p className="settings-hint">
+            We&rsquo;ll auto-refresh and run a cross-project insights pass 5
+            minutes before this time each day.
+          </p>
           <p className="settings-hint">
             You can change theme, AI model, and review storage paths anytime
             from the Settings button (top of the sidebar).

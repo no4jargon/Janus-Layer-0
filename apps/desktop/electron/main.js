@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
@@ -59,7 +60,7 @@ const createMainWindow = async () => {
     minHeight: 600,
     show: false,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -296,6 +297,21 @@ const registerIpcHandlers = () => {
     return workflowExtractor.extract(text);
   });
 
+  ipcMain.handle('janus:ai:choose-model-file', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Choose a local LLM model (.gguf)',
+      properties: ['openFile'],
+      filters: [
+        { name: 'GGUF model', extensions: ['gguf'] },
+        { name: 'All files', extensions: ['*'] },
+      ],
+    });
+    if (result.canceled || !result.filePaths?.[0]) {
+      return { canceled: true };
+    }
+    return { canceled: false, path: result.filePaths[0] };
+  });
+
   ipcMain.handle('janus:ai:save-output', (_event, input) => {
     const store = createAiOutputStore(requireRuntime().db);
     return store.create({
@@ -384,9 +400,31 @@ const registerIpcHandlers = () => {
 };
 
 const rebuildWorkflowExtractor = (settings) => {
-  workflowExtractor = createWorkflowExtractor({
-    baseUrl: settings?.ollamaBaseUrl || undefined,
-    model: settings?.ollamaModel || undefined,
+  const previous = workflowExtractor;
+  const next = createWorkflowExtractor({
+    modelPath: settings?.llmModelPath || undefined,
+    modelsDir: runtime?.paths?.modelsDir,
+    onModelDownloadProgress: ({ transferredBytes, totalBytes }) => {
+      broadcastEvent('janus:ai:model-download', {
+        transferredBytes,
+        totalBytes,
+      });
+    },
+  });
+  workflowExtractor = next;
+  if (previous) {
+    previous.dispose().catch(() => {
+      /* dispose is best-effort */
+    });
+  }
+
+  // Background-warm the model: triggers the ~5GB Gemma 4 E4B download on
+  // first run, then loads the model into memory so the first extract is
+  // instant. Failures are non-fatal — the next extract call will retry.
+  next.prepare().catch((error) => {
+    runtime?.logger?.warn?.('background model prepare failed', {
+      error: String(error),
+    });
   });
 };
 
@@ -477,11 +515,27 @@ const runUpdateCheck = async (input) => {
   }
 };
 
+const seedEmbeddedConfig = () => {
+  const embeddedPath = path.join(__dirname, 'embedded-config.json');
+  if (!existsSync(embeddedPath)) return;
+  try {
+    const config = JSON.parse(readFileSync(embeddedPath, 'utf8'));
+    for (const [key, value] of Object.entries(config)) {
+      if (!value) continue;
+      if (Object.prototype.hasOwnProperty.call(process.env, key)) continue;
+      process.env[key] = String(value);
+    }
+  } catch {
+    // ignore — config will fall through to runtime errors if needed
+  }
+};
+
 const createRuntime = async () => {
   const repoRoot =
     process.env.JANUS_REPO_ROOT || path.join(__dirname, '..', '..', '..');
 
   loadJanusEnv(repoRoot);
+  seedEmbeddedConfig();
 
   return createJanusRuntime({
     mode: isDev ? 'development' : 'production',
@@ -578,5 +632,8 @@ if (!gotLock) {
 
   app.on('before-quit', () => {
     runtime?.close();
+    workflowExtractor?.dispose().catch(() => {
+      /* dispose is best-effort */
+    });
   });
 }

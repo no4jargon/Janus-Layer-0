@@ -13,14 +13,15 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@janus/ai": "janus:*",
-    "@janus/connectors-gmail": "janus:*",
-    "@janus/connectors-whatsapp": "janus:*",
-    "@janus/core": "janus:*",
-    "@janus/db": "janus:*",
-    "@janus/shared": "janus:*",
+    "@janus/ai": "workspace:*",
+    "@janus/connectors-gmail": "workspace:*",
+    "@janus/connectors-whatsapp": "workspace:*",
+    "@janus/core": "workspace:*",
+    "@janus/db": "workspace:*",
+    "@janus/shared": "workspace:*",
     "baileys": "^7.0.0-rc.9",
-    "electron-updater": "^6.6.2"
+    "electron-updater": "^6.6.2",
+    "node-llama-cpp": "^3.4.0"
   },
   "devDependencies": {
     "electron": "^41.3.0",
@@ -33,6 +34,10 @@
     "files": [
       "electron/**/*",
       "package.json"
+    ],
+    "asarUnpack": [
+      "**/node_modules/node-llama-cpp/**",
+      "**/node_modules/@node-llama-cpp/**"
     ],
     "directories": {
       "output": "dist"

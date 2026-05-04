@@ -36,9 +36,11 @@ type JanusRuntimeSnapshot = {
   settings: {
     onboardingCompleted: boolean;
     theme: 'system' | 'light' | 'dark';
-    ollamaBaseUrl: string | null;
-    ollamaModel: string | null;
+    llmModelPath: string | null;
+    workStartTime: string | null;
+    lastOpenedAt: number | null;
   };
+  previousLastOpenedAt: number | null;
   connectors: ConnectorSnapshot[];
   migrationFailure: SerializedMigrationFailure | null;
 };
@@ -286,6 +288,9 @@ declare global {
       };
       ai: {
         extractWorkflow: (text: string) => Promise<string>;
+        chooseModelFile: () => Promise<
+          { canceled: true } | { canceled: false; path: string }
+        >;
         saveOutput: (input: {
           clusterId?: string | null;
           kind: string;
@@ -322,6 +327,12 @@ declare global {
         ) => () => void;
         onGmailEvent: (handler: (event: GmailEvent) => void) => () => void;
         onUpdateEvent: (handler: (event: UpdateEvent) => void) => () => void;
+        onModelDownload: (
+          handler: (status: {
+            transferredBytes: number;
+            totalBytes: number;
+          }) => void,
+        ) => () => void;
       };
     };
   }

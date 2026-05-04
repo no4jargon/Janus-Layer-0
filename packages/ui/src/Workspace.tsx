@@ -236,7 +236,42 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
   const [isEmailSending, setIsEmailSending] = useState(false);
   const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
   const [cheatModalOpen, setCheatModalOpen] = useState(false);
+  const [gmailPreflightOpen, setGmailPreflightOpen] = useState(false);
+  const [gmailConnecting, setGmailConnecting] = useState(false);
+  const [promptState, setPromptState] = useState<{
+    title: string;
+    resolve: (value: string | null) => void;
+  } | null>(null);
+  const [promptValue, setPromptValue] = useState('');
+  const promptInputRef = useRef<HTMLInputElement | null>(null);
+
+  const showPrompt = useCallback(
+    (title: string, defaultValue = '') =>
+      new Promise<string | null>((resolve) => {
+        setPromptValue(defaultValue);
+        setPromptState({ title, resolve });
+      }),
+    [],
+  );
+
+  const closePrompt = useCallback((value: string | null) => {
+    setPromptState((current) => {
+      current?.resolve(value);
+      return null;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (promptState) {
+      const handle = window.setTimeout(() => {
+        promptInputRef.current?.focus();
+        promptInputRef.current?.select();
+      }, 0);
+      return () => window.clearTimeout(handle);
+    }
+  }, [promptState]);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [autoRunAllToken, setAutoRunAllToken] = useState(0);
   const [clusterMenu, setClusterMenu] = useState<{
     cluster: ClusterRecord;
     x: number;
@@ -301,6 +336,19 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
     setEmailThreads(threads.map(toListItemEmail));
   }, []);
 
+  const refreshAll = useCallback(async () => {
+    if (!window.janusApi) return;
+    await Promise.allSettled([
+      window.janusApi.syncConnector('gmail'),
+      window.janusApi.syncConnector('whatsapp'),
+    ]);
+    await Promise.all([
+      loadWhatsappChats(),
+      loadEmailThreads(),
+      refreshClusters(),
+    ]);
+  }, [loadEmailThreads, loadWhatsappChats, refreshClusters]);
+
   const loadWhatsappThread = useCallback(async (jid: string) => {
     if (!window.janusApi) return;
     const messages = await window.janusApi.whatsapp.getChat(jid);
@@ -349,6 +397,41 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
       await Promise.all([loadWhatsappChats(), loadEmailThreads(), refreshClusters()]);
     })();
   }, [loadEmailThreads, loadWhatsappChats, refreshClusters]);
+
+  // Daily auto-run: fire AiPanel "for all projects (since last opened)" 5 minutes
+  // before the user's configured work-start-time. If today's window has passed,
+  // schedule for tomorrow.
+  useEffect(() => {
+    const workStartTime = snapshot.settings.workStartTime;
+    if (!workStartTime || !/^([01]\d|2[0-3]):[0-5]\d$/.test(workStartTime)) {
+      return;
+    }
+    const [hh, mm] = workStartTime.split(':').map((n) => Number(n));
+
+    const computeNextFireDelay = (): number => {
+      const now = new Date();
+      const fire = new Date(now);
+      fire.setHours(hh, mm, 0, 0);
+      fire.setMinutes(fire.getMinutes() - 5);
+      if (fire.getTime() <= now.getTime()) {
+        fire.setDate(fire.getDate() + 1);
+      }
+      return fire.getTime() - now.getTime();
+    };
+
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const arm = () => {
+      const delay = computeNextFireDelay();
+      timer = setTimeout(() => {
+        setAutoRunAllToken((n) => n + 1);
+        arm();
+      }, delay);
+    };
+    arm();
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [snapshot.settings.workStartTime]);
 
   // Refresh thread when active thread changes (after lists update we keep the open one)
   useEffect(() => {
@@ -449,7 +532,7 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
 
   const onCreateCluster = useCallback(async () => {
     if (!selectedItems.size || !window.janusApi) return;
-    const rawName = window.prompt('Cluster name?');
+    const rawName = await showPrompt('Cluster name?');
     if (rawName === null) return;
     const name = rawName.trim();
     if (!name) {
@@ -475,12 +558,12 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
     setSelectedItems(new Set());
     lastAnchorIndexRef.current = null;
     await refreshClusters();
-  }, [refreshClusters, selectedItems]);
+  }, [refreshClusters, selectedItems, showPrompt]);
 
   const onRenameCluster = useCallback(
     async (cluster: ClusterRecord) => {
       if (!window.janusApi) return;
-      const next = window.prompt('Rename cluster', cluster.name);
+      const next = await showPrompt('Rename cluster', cluster.name);
       if (next === null) return;
       const trimmed = next.trim();
       if (!trimmed) return;
@@ -490,7 +573,7 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
       });
       await refreshClusters();
     },
-    [refreshClusters],
+    [refreshClusters, showPrompt],
   );
 
   const onRecolorCluster = useCallback(
@@ -603,15 +686,24 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
     loadEmailThreads,
   ]);
 
-  const onConnectGmail = useCallback(async () => {
+  const onConnectGmail = useCallback(() => {
+    setGmailPreflightOpen(true);
+  }, []);
+
+  const confirmConnectGmail = useCallback(async () => {
     if (!window.janusApi) return;
+    setGmailConnecting(true);
     try {
       await window.janusApi.connectConnector('gmail');
+      setGmailPreflightOpen(false);
     } catch (error) {
       setEmailSendingStatus({
         text: `Connect failed: ${error instanceof Error ? error.message : String(error)}`,
         isError: true,
       });
+      setGmailPreflightOpen(false);
+    } finally {
+      setGmailConnecting(false);
     }
   }, []);
 
@@ -1257,7 +1349,139 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
         whatsappChats={whatsappChats}
         emailThreads={emailThreads}
         selectionCount={selectedMessageKeys.size}
+        previousLastOpenedAt={snapshot.previousLastOpenedAt}
+        onRefreshAll={refreshAll}
+        autoRunAllToken={autoRunAllToken}
       />
+
+      {gmailPreflightOpen ? (
+        <div
+          className="modal-overlay"
+          onClick={(event) => {
+            if (event.target === event.currentTarget && !gmailConnecting) {
+              setGmailPreflightOpen(false);
+            }
+          }}
+        >
+          <div
+            className="modal-card gmail-preflight-card"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="modal-title-row">
+              <h3>Heads up: Google's about to look concerned</h3>
+              {!gmailConnecting ? (
+                <button
+                  className="modal-close"
+                  onClick={() => setGmailPreflightOpen(false)}
+                >
+                  ✕
+                </button>
+              ) : null}
+            </div>
+            <div className="gmail-preflight-body">
+              <p>
+                When you continue, your browser will open Google's sign-in page.
+                After you pick your account, Google will show a scary{' '}
+                <strong>"Google hasn't verified this app"</strong> screen.
+              </p>
+              <p>
+                That's expected. Click <strong>Advanced</strong> →{' '}
+                <strong>Go to Janus Layer 0 (unsafe)</strong>. Your data still
+                only ever touches your machine — nothing is stored on our
+                servers.
+              </p>
+              <details className="gmail-preflight-why">
+                <summary>Why the warning?</summary>
+                <p>
+                  Letting an app talk to Gmail puts you in Google's "restricted
+                  scopes" tier. To make that warning go away, we'd need to spend
+                  4–6 weeks on Google's verification process plus pay a
+                  third-party security firm five figures a year for a CASA
+                  audit.
+                </p>
+                <p>
+                  We didn't have 4–6 weeks for that verification BS for a beta.
+                  We'll do it once enough of you tell us this thing is worth
+                  shipping.
+                </p>
+              </details>
+            </div>
+            <div className="prompt-actions">
+              <button
+                type="button"
+                className="modal-close"
+                disabled={gmailConnecting}
+                onClick={() => setGmailPreflightOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="prompt-submit"
+                disabled={gmailConnecting}
+                onClick={() => void confirmConnectGmail()}
+              >
+                {gmailConnecting ? 'Opening Google…' : 'Open Google sign-in'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {promptState ? (
+        <div
+          className="modal-overlay"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closePrompt(null);
+          }}
+        >
+          <form
+            className="modal-card"
+            role="dialog"
+            aria-modal="true"
+            onSubmit={(event) => {
+              event.preventDefault();
+              closePrompt(promptValue);
+            }}
+          >
+            <div className="modal-title-row">
+              <h3>{promptState.title}</h3>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => closePrompt(null)}
+              >
+                ✕
+              </button>
+            </div>
+            <input
+              ref={promptInputRef}
+              className="prompt-input"
+              value={promptValue}
+              onChange={(event) => setPromptValue(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  closePrompt(null);
+                }
+              }}
+            />
+            <div className="prompt-actions">
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => closePrompt(null)}
+              >
+                Cancel
+              </button>
+              <button type="submit" className="prompt-submit">
+                OK
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
 
       {cheatModalOpen ? (
         <div

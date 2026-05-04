@@ -9,6 +9,7 @@ export type AppDataPaths = {
   logsDir: string;
   attachmentsDir: string;
   keystoreDir: string;
+  modelsDir: string;
 };
 
 export const resolveAppDataPaths = (input: {
@@ -27,6 +28,7 @@ export const resolveAppDataPaths = (input: {
     logsDir: path.join(baseDir, 'logs'),
     attachmentsDir: path.join(baseDir, 'attachments'),
     keystoreDir: path.join(baseDir, 'keystore'),
+    modelsDir: path.join(baseDir, 'models'),
   };
 };
 
@@ -35,4 +37,5 @@ export const ensureAppDataPaths = (paths: AppDataPaths) => {
   mkdirSync(paths.logsDir, { recursive: true });
   mkdirSync(paths.attachmentsDir, { recursive: true });
   mkdirSync(paths.keystoreDir, { recursive: true });
+  mkdirSync(paths.modelsDir, { recursive: true });
 };

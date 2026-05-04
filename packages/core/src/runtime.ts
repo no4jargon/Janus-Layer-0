@@ -51,6 +51,7 @@ export type RuntimeSnapshot = {
     logsDir: string;
   };
   settings: JanusSettings;
+  previousLastOpenedAt: number | null;
   connectors: ConnectorSnapshot[];
   migrationFailure: SerializedMigrationFailure | null;
 };
@@ -108,6 +109,8 @@ export const createJanusRuntime = (
   }
 
   const settingsStore = createSettingsStore({ baseDir: paths.baseDir, logger });
+  const previousLastOpenedAt = settingsStore.read().lastOpenedAt;
+  settingsStore.write({ lastOpenedAt: Date.now() });
   const connectorStore = createConnectorStateStore(db);
 
   const connectors = input.buildConnectors({ db, paths, logger });
@@ -142,6 +145,7 @@ export const createJanusRuntime = (
       logsDir: paths.logsDir,
     },
     settings: settingsStore.read(),
+    previousLastOpenedAt,
     connectors: connectorRuntime.list(),
     migrationFailure: serializeMigrationFailure(migrationFailure),
   });

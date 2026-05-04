@@ -8,6 +8,9 @@ const desktopRoot = path.join(__dirname, '..');
 
 const isRelease = process.env.JANUS_RELEASE === '1';
 const isPublish = process.env.JANUS_PUBLISH === '1';
+// In multi-platform CI, only one job (the macOS one) should write
+// latest.json. Other platform jobs set this to skip the write+upload.
+const skipLatestJson = process.env.JANUS_SKIP_LATEST_JSON === '1';
 
 execSync('node ./electron/build.js', {
   cwd: desktopRoot,
@@ -36,7 +39,7 @@ execSync(`electron-builder ${flags.join(' ')}`.trim(), {
   stdio: 'inherit',
 });
 
-if (isRelease) {
+if (isRelease && !skipLatestJson) {
   const pkg = JSON.parse(
     readFileSync(path.join(desktopRoot, 'package.json'), 'utf8'),
   );

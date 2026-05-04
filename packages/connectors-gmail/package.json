@@ -19,8 +19,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@janus/core": "janus:*",
-    "@janus/db": "janus:*",
-    "@janus/shared": "janus:*"
+    "@janus/core": "workspace:*",
+    "@janus/db": "workspace:*",
+    "@janus/shared": "workspace:*"
   }
 }

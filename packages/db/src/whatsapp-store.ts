@@ -286,8 +286,24 @@ export const createWhatsAppStore = (db: Database) => {
   const getChats = (limit = 250): WaChatRecord[] => {
     const rows = db
       .prepare(
-        `SELECT jid, name, is_group, last_message_ts, last_message_text, last_message_type, unread
-         FROM wa_chats ORDER BY last_message_ts DESC LIMIT ?`,
+        `SELECT
+           c.jid,
+           COALESCE(
+             NULLIF(TRIM(c.name), ''),
+             NULLIF(TRIM(ct.name), ''),
+             NULLIF(TRIM(ct.notify), ''),
+             NULLIF(TRIM(ct.verified_name), ''),
+             NULLIF(TRIM(ct.username), '')
+           ) AS name,
+           c.is_group,
+           c.last_message_ts,
+           c.last_message_text,
+           c.last_message_type,
+           c.unread
+         FROM wa_chats c
+         LEFT JOIN wa_contacts ct ON ct.jid = c.jid
+         ORDER BY c.last_message_ts DESC
+         LIMIT ?`,
       )
       .all(limit) as any[];
     return rows.map(mapChatRow);

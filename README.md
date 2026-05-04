@@ -46,6 +46,18 @@ See `docs/RELEASE.md` for signing + publish details, and `docs/QA_PLAN.md` for t
 
 `pnpm dev` triggers a one-shot build of `@janus/{shared,db,core,connectors-gmail,connectors-whatsapp}` so the Electron main process can resolve them at runtime.
 
+## Reset commands (macOS)
+
+```bash
+pnpm app:rebuild            # rebuild the .app, DB preserved
+pnpm app:rebuild-fresh      # wipe ALL app data (DB, settings, OAuth tokens, logs), then rebuild
+pnpm db:wipe                # wipe just the SQLite database; OAuth tokens + settings stay
+```
+
+Quit the app before running `app:rebuild-fresh` or `db:wipe` — Electron has the SQLite WAL open while running, and a live instance will write its in-memory state back over your reset.
+
+These scripts target the macOS userData path (`~/Library/Application Support/@janus/desktop/`). On Windows/Linux the paths are different; use `pnpm verify:data-paths` to print the exact location for your platform.
+
 ## Runtime data conventions
 
 - Development data root: `<repo>/.dev-data/`

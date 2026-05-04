@@ -5,15 +5,17 @@ import type { Logger } from './logger.js';
 export type JanusSettings = {
   onboardingCompleted: boolean;
   theme: 'system' | 'light' | 'dark';
-  ollamaBaseUrl: string | null;
-  ollamaModel: string | null;
+  llmModelPath: string | null;
+  workStartTime: string | null;
+  lastOpenedAt: number | null;
 };
 
 const DEFAULT_SETTINGS: JanusSettings = {
   onboardingCompleted: false,
   theme: 'system',
-  ollamaBaseUrl: null,
-  ollamaModel: null,
+  llmModelPath: null,
+  workStartTime: null,
+  lastOpenedAt: null,
 };
 
 export const createSettingsStore = (input: { baseDir: string; logger: Logger }) => {

@@ -27,6 +27,24 @@ type Props = {
   whatsappChats: ListItem[];
   emailThreads: ListItem[];
   selectionCount: number;
+  previousLastOpenedAt: number | null;
+  onRefreshAll: () => Promise<void>;
+  autoRunAllToken: number;
+};
+
+type AllHoursOption = number | 'since-last-opened';
+
+const SINCE_LAST_OPENED_FALLBACK_HOURS = 24;
+
+const computeSinceLastOpenedHours = (
+  previousLastOpenedAt: number | null,
+): number => {
+  if (!previousLastOpenedAt) return SINCE_LAST_OPENED_FALLBACK_HOURS;
+  const hours = (Date.now() - previousLastOpenedAt) / (60 * 60 * 1000);
+  if (!Number.isFinite(hours) || hours <= 0) {
+    return SINCE_LAST_OPENED_FALLBACK_HOURS;
+  }
+  return hours;
 };
 
 type WaThreadMessage = {
@@ -176,6 +194,9 @@ export const AiPanel = ({
   whatsappChats: _whatsappChats,
   emailThreads: _emailThreads,
   selectionCount,
+  previousLastOpenedAt,
+  onRefreshAll,
+  autoRunAllToken,
 }: Props) => {
   void _whatsappChats;
   void _emailThreads;
@@ -191,7 +212,7 @@ export const AiPanel = ({
     null,
   );
   const [selectedHours, setSelectedHours] = useState<number>(2);
-  const [selectedAllHours, setSelectedAllHours] = useState<number>(2);
+  const [selectedAllHours, setSelectedAllHours] = useState<AllHoursOption>(2);
   const [clusterMenuOpen, setClusterMenuOpen] = useState(false);
   const [hoursMenuOpen, setHoursMenuOpen] = useState(false);
   const [allHoursMenuOpen, setAllHoursMenuOpen] = useState(false);
@@ -215,6 +236,33 @@ export const AiPanel = ({
   }>({ visible: false, completed: 0, total: 0, label: 'Processing projects…' });
 
   const containerRef = useRef<HTMLElement | null>(null);
+  const runForAllRef = useRef<() => Promise<void>>(async () => {});
+  const [modelDownload, setModelDownload] = useState<{
+    transferredBytes: number;
+    totalBytes: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const api = window.janusApi;
+    if (!api) return;
+    return api.events.onModelDownload((status) => {
+      setModelDownload(status);
+      if (status.totalBytes > 0 && status.transferredBytes >= status.totalBytes) {
+        setTimeout(() => setModelDownload(null), 500);
+      }
+    });
+  }, []);
+
+  const downloadStatusText = useMemo(() => {
+    if (!modelDownload || modelDownload.totalBytes <= 0) return null;
+    const mb = (n: number) => (n / (1024 * 1024)).toFixed(1);
+    const pct = Math.round(
+      (modelDownload.transferredBytes / modelDownload.totalBytes) * 100,
+    );
+    return `Downloading default model (Gemma 4 E4B): ${mb(
+      modelDownload.transferredBytes,
+    )} / ${mb(modelDownload.totalBytes)} MB (${pct}%)`;
+  }, [modelDownload]);
 
   useEffect(() => {
     if (selectedClusterId && sortedClusters.some((c) => c.id === selectedClusterId)) {
@@ -314,6 +362,25 @@ export const AiPanel = ({
     }
     closeAllMenus();
     setBusyAll(true);
+
+    const isSinceLastOpened = selectedAllHours === 'since-last-opened';
+    const effectiveLookbackHours = isSinceLastOpened
+      ? computeSinceLastOpenedHours(previousLastOpenedAt)
+      : selectedAllHours;
+
+    if (isSinceLastOpened) {
+      setStatusAll('Refreshing connectors before extraction…');
+      setOutputAll('Refreshing connectors and reloading data…');
+      try {
+        await onRefreshAll();
+      } catch (error) {
+        // Refresh failures are non-fatal; we still attempt the run on cached data.
+        setStatusAll(
+          `Refresh failed (${error instanceof Error ? error.message : String(error)}); running on cached data…`,
+        );
+      }
+    }
+
     setOutputAll('Running extraction across all projects...');
     setStatusAll('Starting all-project extraction...');
     setProgress({
@@ -330,7 +397,7 @@ export const AiPanel = ({
         const items = itemsForCluster(cluster.id, clusterMap);
         const payload = await collectClusterPromptPayload(
           cluster,
-          selectedAllHours,
+          effectiveLookbackHours,
           items,
         );
         if (!payload.ok) {
@@ -365,7 +432,10 @@ export const AiPanel = ({
         setProgress((prev) => ({ ...prev, completed: index + 1 }));
       }
 
-      const collated = renderCollatedClusterOutput(results, selectedAllHours);
+      const collated = renderCollatedClusterOutput(
+        results,
+        effectiveLookbackHours,
+      );
       setOutputAll(collated);
 
       const okCount = results.filter((r) => r.status === 'ok').length;
@@ -376,10 +446,13 @@ export const AiPanel = ({
       );
 
       try {
+        const hoursSummary = isSinceLastOpened
+          ? `since-last-opened(${effectiveLookbackHours.toFixed(2)}h)`
+          : `${effectiveLookbackHours}h`;
         await window.janusApi!.ai.saveOutput({
           clusterId: null,
           kind: 'workflow.all-clusters',
-          inputSummary: `clusters=${sortedClusters.length} hours=${selectedAllHours}`,
+          inputSummary: `clusters=${sortedClusters.length} hours=${hoursSummary}`,
           outputText: collated,
         });
       } catch {
@@ -393,6 +466,16 @@ export const AiPanel = ({
       setBusyAll(false);
     }
   };
+
+  useEffect(() => {
+    runForAllRef.current = runForAll;
+  });
+
+  useEffect(() => {
+    if (autoRunAllToken <= 0) return;
+    void runForAllRef.current();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRunAllToken]);
 
   return (
     <aside ref={containerRef} className="ai-panel open">
@@ -511,7 +594,7 @@ export const AiPanel = ({
           ) : null}
         </div>
       </div>
-      <div className="ai-status">{status}</div>
+      <div className="ai-status">{downloadStatusText ?? status}</div>
       <textarea
         className="ai-output-box"
         rows={7}
@@ -552,7 +635,11 @@ export const AiPanel = ({
                 setAllHoursMenuOpen((open) => !open);
               }}
             >
-              <span>{selectedAllHours}h</span>
+              <span>
+                {selectedAllHours === 'since-last-opened'
+                  ? 'since last opened'
+                  : `${selectedAllHours}h`}
+              </span>
               <span className="ai-cluster-caret">▾</span>
             </span>
           </button>
@@ -573,6 +660,18 @@ export const AiPanel = ({
                   {hour}h
                 </button>
               ))}
+              <button
+                key="since-last-opened"
+                type="button"
+                className="ai-cluster-option"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setSelectedAllHours('since-last-opened');
+                  setAllHoursMenuOpen(false);
+                }}
+              >
+                since last opened
+              </button>
             </div>
           ) : null}
         </div>

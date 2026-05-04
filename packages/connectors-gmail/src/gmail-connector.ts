@@ -172,7 +172,11 @@ export const createGmailConnector = (
 
     try {
       const selfEmail = account.emailAddress;
+      options.logger.info('gmail sync started', { selfEmail });
       const threadIds = await listRecentThreadIds(token);
+      options.logger.info('gmail sync fetched thread ids', {
+        count: threadIds.length,
+      });
       let upsertedThreads = 0;
       let upsertedMessages = 0;
 
@@ -336,11 +340,15 @@ export const createGmailConnector = (
       status.lastSyncStatus = 'idle';
       status.lastSyncSummary = summary;
 
+      options.logger.info('gmail sync completed', summary);
       return summary;
     } catch (error) {
       status.lastSyncStatus = 'error';
       status.lastSyncError =
         error instanceof Error ? error.message : String(error);
+      options.logger.error('gmail sync failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   };

@@ -5,6 +5,8 @@ export {
 } from './workflow-prompt.js';
 export {
   createWorkflowExtractor,
+  DEFAULT_MODEL_LABEL,
+  DEFAULT_MODEL_URI,
   type WorkflowExtractor,
   type WorkflowExtractorOptions,
-} from './ollama.js';
+} from './llama-cpp.js';
