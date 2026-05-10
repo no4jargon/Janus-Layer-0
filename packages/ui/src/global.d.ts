@@ -40,6 +40,8 @@ type JanusRuntimeSnapshot = {
     workStartTime: string | null;
     lastOpenedAt: number | null;
     privacyBannerDismissed: boolean;
+    tutorialCompleted: boolean;
+    freemiumBannerDismissed: boolean;
   };
   previousLastOpenedAt: number | null;
   connectors: ConnectorSnapshot[];

@@ -9,6 +9,8 @@ export type JanusSettings = {
   workStartTime: string | null;
   lastOpenedAt: number | null;
   privacyBannerDismissed: boolean;
+  tutorialCompleted: boolean;
+  freemiumBannerDismissed: boolean;
 };
 
 const DEFAULT_SETTINGS: JanusSettings = {
@@ -18,6 +20,8 @@ const DEFAULT_SETTINGS: JanusSettings = {
   workStartTime: null,
   lastOpenedAt: null,
   privacyBannerDismissed: false,
+  tutorialCompleted: false,
+  freemiumBannerDismissed: false,
 };
 
 export const createSettingsStore = (input: { baseDir: string; logger: Logger }) => {

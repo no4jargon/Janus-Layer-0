@@ -9,12 +9,14 @@ import {
 import { AiPanel } from './AiPanel';
 import { OnboardingModal, SettingsModal } from './Settings';
 import { OptionalUpdateBanner, PrivacyBanner } from './UpdateScreens';
+import { FreemiumBanner, FreemiumModal, TutorialModal } from './Modals';
 import {
   CLUSTER_COLORS,
   clusterDot,
   getClusterColor,
   randomClusterColorId,
 } from './lib/cluster-colors';
+import { avatarInitials, avatarStyle } from './lib/avatar';
 import {
   formatTime,
   itemKey,
@@ -198,6 +200,9 @@ type Props = {
 
 export const Workspace = ({ snapshot, updateInfo }: Props) => {
   const [optionalUpdateDismissed, setOptionalUpdateDismissed] = useState(false);
+  const [chatFilter, setChatFilter] = useState<
+    'all' | 'unread' | 'favorites' | 'groups'
+  >('all');
   const [activeTab, setActiveTab] = useState<'whatsapp' | 'email' | 'clusters'>(
     'whatsapp',
   );
@@ -271,6 +276,7 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
     }
   }, [promptState]);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [freemiumModalOpen, setFreemiumModalOpen] = useState(false);
   const [autoRunAllToken, setAutoRunAllToken] = useState(0);
   const [clusterMenu, setClusterMenu] = useState<{
     cluster: ClusterRecord;
@@ -865,6 +871,8 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
       activeThread.id === item.id;
     const isSelected = selectedItems.has(itemKey(item));
 
+    const av = avatarStyle(item.title || item.id);
+    const initials = avatarInitials(item.title);
     return (
       <div
         key={`${item.sourceType}:${item.id}`}
@@ -872,23 +880,39 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
         style={borderStyle}
         onClick={(event) => handleItemClick(item, items, index, event)}
       >
-        <div className="chat-name">
-          {item.title}
-          {extraBadge ? (
-            <>
-              {' '}
-              <span className="source-badge">{extraBadge}</span>
-            </>
-          ) : null}
+        <div
+          className="chat-avatar"
+          style={{ background: av.background, color: av.color }}
+          aria-hidden="true"
+        >
+          {initials}
         </div>
-        <div className="chat-subtitle">{item.subtitle}</div>
-        <div className="chat-preview">{item.preview || '[No preview]'}</div>
-        <div className="chat-item-meta">
-          <span>{formatTime(item.time)}</span>
-          {item.unreadCount ? (
-            <span className="unread-dot">{item.unreadCount}</span>
+        <div className="chat-item-body">
+          <div className="chat-item-top">
+            <span className="chat-name">{item.title}</span>
+            <span className="chat-time">{formatTime(item.time)}</span>
+          </div>
+          <div className="chat-item-bottom">
+            <span className="chat-preview">
+              {item.preview || '[No preview]'}
+            </span>
+            <span className="chat-item-meta">
+              {item.hasAttachments ? (
+                <span className="attach-dot" aria-label="has attachment">
+                  📎
+                </span>
+              ) : null}
+              {extraBadge ? (
+                <span className="source-badge">{extraBadge}</span>
+              ) : null}
+              {item.unreadCount ? (
+                <span className="unread-dot">{item.unreadCount}</span>
+              ) : null}
+            </span>
+          </div>
+          {item.subtitle ? (
+            <div className="chat-subtitle">{item.subtitle}</div>
           ) : null}
-          {item.hasAttachments ? <span className="attach-dot">📎</span> : null}
         </div>
       </div>
     );
@@ -1037,6 +1061,16 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
             }}
           />
         ) : null}
+        {!snapshot.settings.freemiumBannerDismissed ? (
+          <FreemiumBanner
+            onUpgradeClick={() => setFreemiumModalOpen(true)}
+            onDismiss={() => {
+              void window.janusApi?.updateSettings({
+                freemiumBannerDismissed: true,
+              });
+            }}
+          />
+        ) : null}
         {updateInfo && updateInfo.kind === 'optional' && !optionalUpdateDismissed ? (
           <OptionalUpdateBanner
             info={updateInfo}
@@ -1180,6 +1214,31 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
           </div>
         ) : null}
 
+        {activeTab !== 'clusters' ? (
+          <div className="chat-filter-chips" role="tablist" aria-label="Filter">
+            {(['all', 'unread', 'favorites', 'groups'] as const).map(
+              (filter) => (
+                <button
+                  key={filter}
+                  type="button"
+                  role="tab"
+                  aria-selected={chatFilter === filter}
+                  className={`chat-filter-chip${chatFilter === filter ? ' active' : ''}`}
+                  onClick={() => setChatFilter(filter)}
+                >
+                  {filter === 'all'
+                    ? 'All'
+                    : filter === 'unread'
+                      ? 'Unread'
+                      : filter === 'favorites'
+                        ? 'Favorites'
+                        : 'Groups'}
+                </button>
+              ),
+            )}
+          </div>
+        ) : null}
+
         <div id="chatList">
           {activeTab === 'clusters' ? (
             clusterGroups.length === 0 ? (
@@ -1221,7 +1280,20 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
               ))
             )
           ) : (
-            items.map((item, idx) => renderItemRow(item, items, idx))
+            (() => {
+              const visible =
+                chatFilter === 'unread'
+                  ? items.filter((item) => (item.unreadCount ?? 0) > 0)
+                  : items;
+              if (visible.length === 0 && chatFilter === 'unread') {
+                return (
+                  <div className="chat-empty-state">No unread chats.</div>
+                );
+              }
+              return visible.map((item, idx) =>
+                renderItemRow(item, visible, idx),
+              );
+            })()
           )}
         </div>
       </aside>
@@ -1235,19 +1307,60 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
           >
             ←
           </button>
+          {activeThread ? (
+            <div
+              className="thread-header-avatar"
+              style={(() => {
+                const av = avatarStyle(activeThreadTitle);
+                return { background: av.background, color: av.color };
+              })()}
+              aria-hidden="true"
+            >
+              {avatarInitials(activeThreadTitle)}
+            </div>
+          ) : null}
           <h2>{activeThreadTitle}</h2>
+          {activeThread ? (
+            <div className="thread-header-actions">
+              <button
+                className="thread-header-icon-btn"
+                aria-label="Video call (coming soon)"
+                title="Video call (coming soon)"
+                disabled
+              >
+                📹
+              </button>
+              <button
+                className="thread-header-icon-btn"
+                aria-label="Voice call (coming soon)"
+                title="Voice call (coming soon)"
+                disabled
+              >
+                📞
+              </button>
+            </div>
+          ) : null}
         </header>
-        <div className="thread" ref={threadElRef}>
+        <div className="thread thread-doodle" ref={threadElRef}>
           {threadMessages.map((message, idx) => renderMessage(message, idx))}
         </div>
         <div className="composer-wrap" hidden={!composerVisible}>
           {showWaComposer ? (
             <div className="composer-block">
-              <div className="composer-row">
+              <div className="composer-row composer-row-wa">
+                <button
+                  className="composer-attach-btn"
+                  aria-label="Attach (coming soon)"
+                  title="Attach (coming soon)"
+                  disabled
+                  type="button"
+                >
+                  +
+                </button>
                 <textarea
                   className="composer-input"
                   rows={2}
-                  placeholder="Type a WhatsApp message"
+                  placeholder="Type a message"
                   value={waInput}
                   onChange={(event) => setWaInput(event.target.value)}
                   onKeyDown={(event) => {
@@ -1576,6 +1689,18 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
 
       {!snapshot.settings.onboardingCompleted ? (
         <OnboardingModal onDone={() => void 0} />
+      ) : !snapshot.settings.tutorialCompleted ? (
+        <TutorialModal
+          onComplete={() => {
+            void window.janusApi?.updateSettings({
+              tutorialCompleted: true,
+            });
+          }}
+        />
+      ) : null}
+
+      {freemiumModalOpen ? (
+        <FreemiumModal onClose={() => setFreemiumModalOpen(false)} />
       ) : null}
     </div>
   );

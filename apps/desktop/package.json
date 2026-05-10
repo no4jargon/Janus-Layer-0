@@ -1,6 +1,6 @@
 {
   "name": "@janus/desktop",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "type": "module",
   "main": "electron/main.js",
@@ -46,7 +46,8 @@
     "publish": {
       "provider": "github",
       "owner": "no4jargon",
-      "repo": "Janus-Layer-0"
+      "repo": "Janus-Layer-0",
+      "releaseType": "draft"
     },
     "mac": {
       "category": "public.app-category.productivity",
