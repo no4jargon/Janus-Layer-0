@@ -1,5 +1,8 @@
 import { useState } from 'react';
 
+const isValidHHMM = (value: string): boolean =>
+  /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+
 type FreemiumBannerProps = {
   onUpgradeClick: () => void;
   onDismiss: () => void;
@@ -116,13 +119,20 @@ type TutorialStep = {
   emoji: string;
   body: string;
   highlight?: string;
+  kind?: 'work-start-time';
 };
 
 const TUTORIAL_STEPS: TutorialStep[] = [
   {
     title: 'Welcome to Janus Layer 0',
     emoji: '👋',
-    body: "Here's a quick 60-second tour of what you can do. You can skip this any time and revisit it from Settings.",
+    body: 'A desktop-first, local workspace for the chats and threads you actually work in. Let’s get you set up — takes about a minute.',
+  },
+  {
+    title: 'When do you start your day?',
+    emoji: '⏰',
+    body: 'We’ll quietly refresh your messages and run a fresh project-insights pass five minutes before this time, so the moment you sit down everything is up to date.',
+    kind: 'work-start-time',
   },
   {
     title: 'Connect WhatsApp',
@@ -145,19 +155,48 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     title: 'Get AI insights from your projects',
     emoji: '🧠',
-    body: "Open the AI panel on the right. Pick a cluster and a time window, then click — Janus reads through every message in that window and extracts todos, deadlines, assignments, and updates. All inference runs locally; nothing leaves your device.",
+    body: 'Open the AI panel on the right. Pick a cluster and a time window, then click — Janus reads through every message in that window and extracts todos, deadlines, assignments, and updates. All inference runs locally; nothing leaves your device.',
     highlight: 'AI panel (right side) → Pick project → Run',
   },
 ];
 
 type TutorialModalProps = {
-  onComplete: () => void;
+  defaultWorkStartTime: string | null;
+  onComplete: (payload: { workStartTime: string }) => void | Promise<void>;
 };
 
-export const TutorialModal = ({ onComplete }: TutorialModalProps) => {
+export const TutorialModal = ({
+  defaultWorkStartTime,
+  onComplete,
+}: TutorialModalProps) => {
   const [stepIndex, setStepIndex] = useState(0);
+  const [workStartTime, setWorkStartTime] = useState<string>(
+    defaultWorkStartTime && isValidHHMM(defaultWorkStartTime)
+      ? defaultWorkStartTime
+      : '09:00',
+  );
+  const [timeError, setTimeError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const step = TUTORIAL_STEPS[stepIndex];
   const isLast = stepIndex === TUTORIAL_STEPS.length - 1;
+
+  const advance = async () => {
+    if (step.kind === 'work-start-time' && !isValidHHMM(workStartTime)) {
+      setTimeError('Enter a valid time in HH:MM format.');
+      return;
+    }
+    setTimeError(null);
+    if (isLast) {
+      setBusy(true);
+      try {
+        await onComplete({ workStartTime });
+      } finally {
+        setBusy(false);
+      }
+    } else {
+      setStepIndex((i) => i + 1);
+    }
+  };
 
   return (
     <div className="modal-overlay">
@@ -180,38 +219,52 @@ export const TutorialModal = ({ onComplete }: TutorialModalProps) => {
         </div>
         <h3 className="tutorial-title">{step.title}</h3>
         <p className="tutorial-body">{step.body}</p>
+        {step.kind === 'work-start-time' ? (
+          <div className="tutorial-input-row">
+            <label
+              htmlFor="tutorial-work-start"
+              className="tutorial-input-label"
+            >
+              Start time
+            </label>
+            <input
+              id="tutorial-work-start"
+              type="time"
+              className="tutorial-time-input"
+              value={workStartTime}
+              onChange={(event) => {
+                setWorkStartTime(event.target.value);
+                setTimeError(null);
+              }}
+            />
+          </div>
+        ) : null}
         {step.highlight ? (
           <div className="tutorial-highlight">{step.highlight}</div>
         ) : null}
+        {timeError ? (
+          <div className="tutorial-error" role="alert">
+            {timeError}
+          </div>
+        ) : null}
         <div className="tutorial-actions">
-          <button
-            className="tutorial-skip"
-            onClick={onComplete}
-            type="button"
-          >
-            Skip tour
-          </button>
           <div className="tutorial-nav">
             {stepIndex > 0 ? (
               <button
                 onClick={() => setStepIndex((i) => i - 1)}
                 type="button"
+                disabled={busy}
               >
                 Back
               </button>
             ) : null}
             <button
               className="composer-send-btn"
-              onClick={() => {
-                if (isLast) {
-                  onComplete();
-                } else {
-                  setStepIndex((i) => i + 1);
-                }
-              }}
+              onClick={() => void advance()}
               type="button"
+              disabled={busy}
             >
-              {isLast ? 'Get started' : 'Next'}
+              {busy ? 'Saving…' : isLast ? 'Get started' : 'Next'}
             </button>
           </div>
         </div>

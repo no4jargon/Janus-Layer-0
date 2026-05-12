@@ -7,7 +7,7 @@ import {
   type CSSProperties,
 } from 'react';
 import { AiPanel } from './AiPanel';
-import { OnboardingModal, SettingsModal } from './Settings';
+import { SettingsModal } from './Settings';
 import { OptionalUpdateBanner, PrivacyBanner } from './UpdateScreens';
 import { FreemiumBanner, FreemiumModal, TutorialModal } from './Modals';
 import {
@@ -179,6 +179,34 @@ const isMobileLayout = () =>
   typeof window !== 'undefined' &&
   window.matchMedia('(max-width: 900px)').matches;
 
+const CONNECT_QUOTES = [
+  "WhatsApp: where 'urgent' means it's been in your unreads for three weeks.",
+  'Email still beats carrier pigeons. By a slim margin.',
+  'Decisions made in WhatsApp groups have all the permanence of a TikTok trend.',
+  'Every "quick question" arrives exactly one Slack channel too late.',
+  'Your inbox is mostly other people’s procrastination wearing a tie.',
+  'Email threads: where context goes to die alphabetically.',
+  'The action item is buried in message 73 of 81. Good luck.',
+  'If WhatsApp built a project tracker, it would be the chat itself. That’s the problem.',
+  'Reply-all is a feature. Reply-all is also why you’re tired.',
+  'Pinning a WhatsApp message is the corporate equivalent of writing it on your hand.',
+  'Read receipts: the office gossip of digital communication.',
+  'Nothing says "cross-functional alignment" like a 27-person email thread.',
+  'WhatsApp work groups: where decisions are made and then mysteriously forgotten.',
+  'Forwarded emails carry the original sender’s regret at the speed of light.',
+  'Voice notes in a work chat are a war crime under the Geneva Convention.',
+  'No one has ever found anything by scrolling up.',
+];
+
+const pickRandomQuote = (current: string | null): string => {
+  if (CONNECT_QUOTES.length <= 1) return CONNECT_QUOTES[0] ?? '';
+  let next = current;
+  while (next === current) {
+    next = CONNECT_QUOTES[Math.floor(Math.random() * CONNECT_QUOTES.length)];
+  }
+  return next ?? CONNECT_QUOTES[0];
+};
+
 const summarizeConnector = (snapshot: Snapshot | null) => {
   const gmail = snapshot?.connectors.find((c) => c.connector === 'gmail');
   const whatsapp = snapshot?.connectors.find((c) => c.connector === 'whatsapp');
@@ -243,6 +271,13 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
   const [cheatModalOpen, setCheatModalOpen] = useState(false);
   const [gmailPreflightOpen, setGmailPreflightOpen] = useState(false);
   const [gmailConnecting, setGmailConnecting] = useState(false);
+  const [connectOverlay, setConnectOverlay] = useState<
+    'whatsapp' | 'gmail' | null
+  >(null);
+  const [connectOverlayQuote, setConnectOverlayQuote] = useState<string>(
+    CONNECT_QUOTES[0],
+  );
+  const sawWaQrRef = useRef(false);
   const [promptState, setPromptState] = useState<{
     title: string;
     resolve: (value: string | null) => void;
@@ -461,9 +496,14 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
       if (event.type === 'qr') {
         setWaQr(event.payload.qr);
         setWaConnectionText('Scan QR to login');
+        sawWaQrRef.current = true;
       } else if (event.type === 'connection' && event.payload.connection === 'open') {
         setWaQr(null);
         setWaConnectionText('WhatsApp connected');
+        if (sawWaQrRef.current) {
+          sawWaQrRef.current = false;
+          setConnectOverlay('whatsapp');
+        }
       } else if (event.type === 'connection' && event.payload.connection === 'close') {
         setWaConnectionText('Disconnected. Reconnecting…');
       } else if (event.type === 'pairing-failed') {
@@ -499,6 +539,27 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
     [loadEmailThreads],
   );
   useConnectorEvents(onConnectorEvent);
+
+  // Drive the connect overlay: rotate quotes while visible, dismiss after
+  // 60s (WhatsApp QR pair) or 20s (Gmail OAuth), and on Gmail completion
+  // run a full refresh so messages definitely appear.
+  useEffect(() => {
+    if (!connectOverlay) return;
+    setConnectOverlayQuote((current) => pickRandomQuote(current));
+    const interval = window.setInterval(() => {
+      setConnectOverlayQuote((current) => pickRandomQuote(current));
+    }, 2800);
+    const duration = connectOverlay === 'whatsapp' ? 60_000 : 20_000;
+    const kind = connectOverlay;
+    const timer = window.setTimeout(() => {
+      setConnectOverlay(null);
+      if (kind === 'gmail') void refreshAll();
+    }, duration);
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(timer);
+    };
+  }, [connectOverlay, refreshAll]);
 
   const renderList = useCallback(() => {
     if (activeTab === 'whatsapp') return whatsappChats;
@@ -702,6 +763,7 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
     try {
       await window.janusApi.connectConnector('gmail');
       setGmailPreflightOpen(false);
+      setConnectOverlay('gmail');
     } catch (error) {
       setEmailSendingStatus({
         text: `Connect failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -1199,12 +1261,16 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
           </button>
         </div>
 
-        <div className="connection">{waConnectionText}</div>
-        <div className={`connection email-sync${emailSyncState.status === 'error' ? ' error' : ''}`}>
-          {emailSyncLine}
-        </div>
+        {activeTab === 'whatsapp' ? (
+          <div className="connection">{waConnectionText}</div>
+        ) : null}
+        {activeTab === 'email' ? (
+          <div className={`connection email-sync${emailSyncState.status === 'error' ? ' error' : ''}`}>
+            {emailSyncLine}
+          </div>
+        ) : null}
 
-        {waQr ? (
+        {activeTab === 'whatsapp' && waQr ? (
           <div className="qr">
             <div>Scan with phone:</div>
             <img
@@ -1687,13 +1753,14 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
         </div>
       ) : null}
 
-      {!snapshot.settings.onboardingCompleted ? (
-        <OnboardingModal onDone={() => void 0} />
-      ) : !snapshot.settings.tutorialCompleted ? (
+      {!snapshot.settings.tutorialCompleted ? (
         <TutorialModal
-          onComplete={() => {
-            void window.janusApi?.updateSettings({
+          defaultWorkStartTime={snapshot.settings.workStartTime ?? null}
+          onComplete={async ({ workStartTime }) => {
+            await window.janusApi?.updateSettings({
+              onboardingCompleted: true,
               tutorialCompleted: true,
+              workStartTime,
             });
           }}
         />
@@ -1701,6 +1768,36 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
 
       {freemiumModalOpen ? (
         <FreemiumModal onClose={() => setFreemiumModalOpen(false)} />
+      ) : null}
+
+      {connectOverlay ? (
+        <div
+          className="connect-overlay"
+          role="alertdialog"
+          aria-live="polite"
+          aria-label={
+            connectOverlay === 'whatsapp'
+              ? 'Linking WhatsApp'
+              : 'Linking Gmail'
+          }
+        >
+          <div className="connect-overlay-card">
+            <div className="connect-overlay-spinner" aria-hidden="true" />
+            <div className="connect-overlay-title">
+              {connectOverlay === 'whatsapp'
+                ? 'Pairing with WhatsApp…'
+                : 'Connecting Gmail…'}
+            </div>
+            <div className="connect-overlay-sub">
+              {connectOverlay === 'whatsapp'
+                ? 'Syncing your chats. This takes about a minute.'
+                : 'Syncing your inbox. About 20 seconds.'}
+            </div>
+            <div key={connectOverlayQuote} className="connect-overlay-quote">
+              “{connectOverlayQuote}”
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   );

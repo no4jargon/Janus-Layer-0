@@ -1656,22 +1656,43 @@ body {
 
 .tutorial-actions {
 	display: flex;
-	justify-content: space-between;
+	justify-content: flex-end;
 	align-items: center;
 	margin-top: 8px;
 }
 
-.tutorial-skip {
-	background: transparent;
-	border: none;
-	color: #64748b;
-	cursor: pointer;
-	font-size: 13px;
-	padding: 6px 8px;
+.tutorial-input-row {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 12px;
+	margin: 8px 0 18px;
 }
 
-.tutorial-skip:hover {
-	color: #1f2937;
+.tutorial-input-label {
+	font-size: 13px;
+	color: #475569;
+}
+
+.tutorial-time-input {
+	font-size: 16px;
+	padding: 8px 12px;
+	border: 1px solid #cbd5e1;
+	border-radius: 8px;
+	background: #fff;
+	color: #0f172a;
+}
+
+.tutorial-time-input:focus {
+	outline: none;
+	border-color: #25d366;
+	box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.18);
+}
+
+.tutorial-error {
+	margin: 0 0 12px;
+	color: #b91c1c;
+	font-size: 13px;
 }
 
 .tutorial-nav {
@@ -1693,4 +1714,77 @@ body {
 	background: #25d366;
 	color: #fff;
 	font-weight: 600;
+}
+
+.connect-overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(15, 23, 42, 0.62);
+	backdrop-filter: blur(4px);
+	-webkit-backdrop-filter: blur(4px);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 10000;
+	animation: connectOverlayFade 240ms ease-out;
+}
+
+.connect-overlay-card {
+	background: #fff;
+	border-radius: 14px;
+	padding: 32px 36px;
+	width: min(440px, calc(100vw - 32px));
+	text-align: center;
+	box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+}
+
+.connect-overlay-spinner {
+	width: 38px;
+	height: 38px;
+	margin: 0 auto 18px;
+	border: 3px solid #e2e8f0;
+	border-top-color: #25d366;
+	border-radius: 50%;
+	animation: connectOverlaySpin 0.9s linear infinite;
+}
+
+.connect-overlay-title {
+	font-size: 18px;
+	font-weight: 600;
+	color: #0f172a;
+	margin-bottom: 6px;
+}
+
+.connect-overlay-sub {
+	font-size: 13px;
+	color: #64748b;
+	margin-bottom: 18px;
+}
+
+.connect-overlay-quote {
+	font-size: 14px;
+	line-height: 1.5;
+	color: #334155;
+	font-style: italic;
+	min-height: 64px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0 4px;
+	animation: connectOverlayQuoteIn 260ms ease-out;
+}
+
+@keyframes connectOverlaySpin {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
+}
+
+@keyframes connectOverlayFade {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+@keyframes connectOverlayQuoteIn {
+	from { opacity: 0; transform: translateY(4px); }
+	to { opacity: 1; transform: translateY(0); }
 }
