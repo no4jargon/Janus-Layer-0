@@ -55,7 +55,8 @@ export const getMessageTimestamp = (message: WAMessage): number => {
 
 export const buildMessageRow = (message: WAMessage): WaMessageRecord => {
   const content = normalizeMessageContent(message.message);
-  const messageType = getContentType(content as any) as string | null;
+  const messageType =
+    (getContentType(content as any) as string | undefined) ?? null;
   const key = message.key;
   const senderJid = key.fromMe
     ? key.remoteJid || null

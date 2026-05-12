@@ -259,7 +259,7 @@ export const AiPanel = ({
     const pct = Math.round(
       (modelDownload.transferredBytes / modelDownload.totalBytes) * 100,
     );
-    return `Downloading default model (Gemma 4 E4B): ${mb(
+    return `Downloading default model (Gemma 3 4B): ${mb(
       modelDownload.transferredBytes,
     )} / ${mb(modelDownload.totalBytes)} MB (${pct}%)`;
   }, [modelDownload]);

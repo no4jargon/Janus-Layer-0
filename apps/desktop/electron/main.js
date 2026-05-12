@@ -425,7 +425,7 @@ const rebuildWorkflowExtractor = (settings) => {
     });
   }
 
-  // Background-warm the model: triggers the ~5GB Gemma 4 E4B download on
+  // Background-warm the model: triggers the ~2.5GB Gemma 3 4B download on
   // first run, then loads the model into memory so the first extract is
   // instant. Failures are non-fatal — the next extract call will retry.
   next.prepare().catch((error) => {

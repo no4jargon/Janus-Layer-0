@@ -29,13 +29,12 @@ export type WorkflowExtractor = {
 };
 
 /**
- * Default model: Google's Gemma 4 E4B Instruct, Q4_K_M quant (~5GB).
- * The E4B variant is the 4B-effective Edge build of Gemma 4. Hosted by
- * `unsloth` on Hugging Face.
+ * Default model: Google's Gemma 3 4B Instruct, Q4_K_M quant (~2.5GB).
+ * Architecture is supported by the stock node-llama-cpp prebuilt binary.
  */
 export const DEFAULT_MODEL_URI =
-  'hf:unsloth/gemma-4-E4B-it-GGUF:gemma-4-E4B-it-Q4_K_M.gguf';
-export const DEFAULT_MODEL_LABEL = 'Gemma 4 E4B Instruct (Q4_K_M)';
+  'hf:unsloth/gemma-3-4b-it-GGUF:gemma-3-4b-it-Q4_K_M.gguf';
+export const DEFAULT_MODEL_LABEL = 'Gemma 3 4B Instruct (Q4_K_M)';
 
 const DEFAULT_CONTEXT_SIZE = 4096;
 const DEFAULT_MAX_TOKENS = 512;

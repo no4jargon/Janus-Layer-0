@@ -157,7 +157,7 @@ export const SettingsModal = ({ snapshot, onClose }: Props) => {
             <p className="settings-hint">
               Workflow extraction runs in-process via llama.cpp. Leave blank
               to use the bundled default —{' '}
-              <strong>Gemma 4 E4B Instruct</strong> (Q4_K_M, ~5GB) — which
+              <strong>Gemma 3 4B Instruct</strong> (Q4_K_M, ~2.5GB) — which
               is auto-downloaded on first use. Override with a path to your
               own <code>.gguf</code> if you prefer a different model. The
               model loads on first use and stays resident until you change
