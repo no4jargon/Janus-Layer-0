@@ -187,7 +187,7 @@ export const createWhatsAppConnector = (
     const sock = makeWASocket({
       version,
       logger: internalPino,
-      browser: Browsers.macOS('Janus Layer 0'),
+      browser: Browsers.macOS('Chai'),
       auth: {
         creds: state.creds,
         keys: makeCacheableSignalKeyStore(state.keys, internalPino),

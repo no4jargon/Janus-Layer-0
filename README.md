@@ -1,4 +1,4 @@
-# Janus Layer 0
+# Chai
 
 Desktop-first, local-first communications workspace for freelancers.
 
@@ -44,7 +44,7 @@ pnpm typecheck          # typecheck all packages
 
 See `docs/RELEASE.md` for signing + publish details, and `docs/QA_PLAN.md` for the friends/family beta checklist.
 
-`pnpm dev` triggers a one-shot build of `@janus/{shared,db,core,connectors-gmail,connectors-whatsapp}` so the Electron main process can resolve them at runtime.
+`pnpm dev` triggers a one-shot build of `@janus/{shared,db,core,connectors-gmail,connectors-whatsapp}` and `chai` so the Electron main process can resolve them at runtime.
 
 ## Reset commands (macOS)
 
@@ -56,7 +56,7 @@ pnpm db:wipe                # wipe just the SQLite database; OAuth tokens + sett
 
 Quit the app before running `app:rebuild-fresh` or `db:wipe` — Electron has the SQLite WAL open while running, and a live instance will write its in-memory state back over your reset.
 
-These scripts target the macOS userData path (`~/Library/Application Support/@janus/desktop/`). On Windows/Linux the paths are different; use `pnpm verify:data-paths` to print the exact location for your platform.
+These scripts target the macOS userData path (`~/Library/Application Support/Chai/`). On Windows/Linux the paths are different; use `pnpm verify:data-paths` to print the exact location for your platform.
 
 ## Runtime data conventions
 

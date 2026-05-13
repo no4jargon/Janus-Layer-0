@@ -64,7 +64,7 @@ jobs:
           JANUS_PUBLISH: '1'
           JANUS_RELEASE_CHANNEL: ${{ inputs.channel || 'beta' }}
           MIN_SUPPORTED_VERSION: ${{ inputs.min_supported_version }}
-        run: pnpm --filter @janus/desktop release
+        run: pnpm --filter chai release
 
       - name: Upload latest.json artifact
         uses: actions/upload-artifact@v4
@@ -115,7 +115,7 @@ jobs:
           JANUS_SKIP_LATEST_JSON: '1'
           JANUS_RELEASE_CHANNEL: ${{ inputs.channel || 'beta' }}
           MIN_SUPPORTED_VERSION: ${{ inputs.min_supported_version }}
-        run: pnpm --filter @janus/desktop release
+        run: pnpm --filter chai release
 
   notify:
     needs: [release, release-windows]

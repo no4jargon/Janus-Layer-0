@@ -20,7 +20,7 @@ const devPaths = resolveAppDataPaths({
 const prodPaths = resolveAppDataPaths({
   mode: 'production',
   repoRoot,
-  userDataPath: path.join(repoRoot, '.prod-data-smoke', 'Janus Layer 0'),
+  userDataPath: path.join(repoRoot, '.prod-data-smoke', 'Chai'),
 });
 
 for (const paths of [devPaths, prodPaths]) {

@@ -15,9 +15,9 @@ Goal: every test below should be exercised on at least one macOS install **and**
 | # | Step | Expected | If broken |
 |---|---|---|---|
 | 1.1 | Install the package by double-clicking the installer | macOS: app drags into Applications; Windows: NSIS wizard completes | Capture the installer log |
-| 1.2 | Launch the app | Onboarding modal appears titled "Welcome to Janus Layer 0" | Diagnostics export → file a bug |
+| 1.2 | Launch the app | Onboarding modal appears titled "Welcome to Chai" | Diagnostics export → file a bug |
 | 1.3 | Click **Get started** | Modal dismisses; main 3-pane workspace renders | Capture screenshot |
-| 1.4 | Open Settings → Storage section | Data root path shows `~/Library/Application Support/Janus Layer 0/data` (mac) or `%APPDATA%\Janus Layer 0\data` (win) | Path mismatch = file a bug |
+| 1.4 | Open Settings → Storage section | Data root path shows `~/Library/Application Support/Chai/data` (mac) or `%APPDATA%\Chai\data` (win) | Path mismatch = file a bug |
 
 ## 2. Connectors
 
@@ -96,7 +96,7 @@ The default release flow forces every prior version to update (see `docs/RELEASE
 | 6.8 | While on the required screen, try to bypass via window menus / DevTools | No code path exits the screen short of installing the new version; verify by inspecting React tree / IPC calls |
 
 Notes for testers:
-- macOS: first launch of an unsigned build needs **right-click → Open** the first time, or `xattr -d com.apple.quarantine "/Applications/Janus Layer 0.app"`. Document this in the release notes when you ship.
+- macOS: first launch of an unsigned build needs **right-click → Open** the first time, or `xattr -d com.apple.quarantine "/Applications/Chai.app"`. Document this in the release notes when you ship.
 - Windows: first launch shows SmartScreen warning. Click **More info → Run anyway**.
 - The blocking screen polls `latest.json` only on launch, so updating the feed mid-session does not unblock a running app — the user must relaunch (the same way they would after installing a new version).
 

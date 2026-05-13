@@ -1575,7 +1575,7 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
               </p>
               <p>
                 That's expected. Click <strong>Advanced</strong> →{' '}
-                <strong>Go to Janus Layer 0 (unsafe)</strong>. Your data still
+                <strong>Go to Chai (unsafe)</strong>. Your data still
                 only ever touches your machine — nothing is stored on our
                 servers.
               </p>

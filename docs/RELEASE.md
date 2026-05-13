@@ -15,7 +15,7 @@ Runs `electron-builder --dir` with `mac.identity=null` and `publish=null`. Produ
 ```bash
 JANUS_RELEASE=1 pnpm package:desktop
 # or
-pnpm --filter @janus/desktop release
+pnpm --filter chai release
 ```
 
 This switches `electron-builder` to the production config in `apps/desktop/package.json`:
@@ -69,7 +69,7 @@ export GH_TOKEN=$(gh auth token)
 # Optional: force users on older versions to update before they can keep using the app
 export MIN_SUPPORTED_VERSION=0.2.0
 
-JANUS_RELEASE=1 JANUS_PUBLISH=1 pnpm --filter @janus/desktop release
+JANUS_RELEASE=1 JANUS_PUBLISH=1 pnpm --filter chai release
 ```
 
 Under the hood:
@@ -99,7 +99,7 @@ To ship a release that should NOT block existing users, set `MIN_SUPPORTED_VERSI
 
 ```bash
 MIN_SUPPORTED_VERSION=0.1.0 JANUS_RELEASE=1 JANUS_PUBLISH=1 \
-  pnpm --filter @janus/desktop release
+  pnpm --filter chai release
 ```
 
 Result: anyone on `< 0.1.0` is still forced; anyone between `0.1.0` and (latest − 1) sees the optional sidebar banner; anyone on the latest is up-to-date.

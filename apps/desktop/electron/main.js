@@ -29,6 +29,12 @@ import { loadJanusEnv } from './env.js';
 
 const { autoUpdater } = electronUpdater;
 
+// Pin the userData folder name. Electron defaults to package.json `name`
+// (`chai`); calling setName before any getPath('userData') gives us
+// the prettier `~/Library/Application Support/Chai/`. Must run
+// before any code that resolves user-data paths.
+app.setName('Chai');
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = process.env.NODE_ENV === 'development';
 

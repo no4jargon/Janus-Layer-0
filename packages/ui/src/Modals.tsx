@@ -124,7 +124,7 @@ type TutorialStep = {
 
 const TUTORIAL_STEPS: TutorialStep[] = [
   {
-    title: 'Welcome to Janus Layer 0',
+    title: 'Welcome to Chai',
     emoji: '👋',
     body: 'A desktop-first, local workspace for the chats and threads you actually work in. Let’s get you set up — takes about a minute.',
   },

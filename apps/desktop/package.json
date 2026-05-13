@@ -1,6 +1,6 @@
 {
-  "name": "@janus/desktop",
-  "version": "0.1.8",
+  "name": "chai",
+  "version": "0.1.9",
   "private": true,
   "type": "module",
   "main": "electron/main.js",
@@ -42,7 +42,7 @@
   },
   "build": {
     "appId": "com.janus.layer0",
-    "productName": "Janus Layer 0",
+    "productName": "Chai",
     "files": [
       "electron/**/*",
       "package.json"
