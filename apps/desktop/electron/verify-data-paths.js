@@ -4,8 +4,8 @@ import {
   createFileLogger,
   ensureAppDataPaths,
   resolveAppDataPaths,
-} from '@janus/core';
-import { bootstrapDatabase } from '@janus/db';
+} from '@chai/core';
+import { bootstrapDatabase } from '@chai/db';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, '..', '..', '..');

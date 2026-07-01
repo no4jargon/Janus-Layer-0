@@ -24,7 +24,7 @@ This file is the practical companion to:
 ## 3. Recommended repository layout
 
 ```text
-janus-layer-0/
+chai/
   apps/
     desktop/
       src/

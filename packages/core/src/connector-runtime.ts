@@ -1,4 +1,4 @@
-import type { ConnectorStateStore } from '@janus/db';
+import type { ConnectorStateStore } from '@chai/db';
 import type { Logger } from './logger.js';
 
 export type ConnectorKind = 'gmail' | 'whatsapp';
@@ -21,7 +21,7 @@ export type ConnectorSnapshot = {
   metadata: ConnectorMetadata;
 };
 
-export interface JanusConnector {
+export interface ChaiConnector {
   readonly kind: ConnectorKind;
   bootstrap?(): Promise<{
     connected: boolean;
@@ -56,7 +56,7 @@ const normalizeStatus = (value: string): ConnectorStatus => {
 export type ConnectorRuntimeInput = {
   store: ConnectorStateStore;
   logger: Logger;
-  connectors: Partial<Record<ConnectorKind, JanusConnector>>;
+  connectors: Partial<Record<ConnectorKind, ChaiConnector>>;
 };
 
 export const createConnectorRuntime = (input: ConnectorRuntimeInput) => {
@@ -120,7 +120,7 @@ export const createConnectorRuntime = (input: ConnectorRuntimeInput) => {
     return next;
   };
 
-  const requireConnector = (kind: ConnectorKind): JanusConnector => {
+  const requireConnector = (kind: ConnectorKind): ChaiConnector => {
     const connector = input.connectors[kind];
     if (!connector) {
       throw new Error(`Connector not registered: ${kind}`);

@@ -8,7 +8,7 @@ export { createFileLogger, type Logger, type LogLevel } from './logger.js';
 export {
   createSettingsStore,
   type SettingsStore,
-  type JanusSettings,
+  type ChaiSettings,
 } from './settings-store.js';
 export {
   createConnectorRuntime,
@@ -18,15 +18,15 @@ export {
   type ConnectorRuntimeInput,
   type ConnectorSnapshot,
   type ConnectorStatus,
-  type JanusConnector,
+  type ChaiConnector,
 } from './connector-runtime.js';
 export {
-  createJanusRuntime,
+  createChaiRuntime,
   type BuildConnectorsContext,
   type CreateRuntimeInput,
   type RuntimeSnapshot,
   type SerializedMigrationFailure,
-  type JanusRuntime,
+  type ChaiRuntime,
 } from './runtime.js';
 export {
   buildDiagnosticsBundle,

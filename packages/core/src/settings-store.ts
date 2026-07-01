@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Logger } from './logger.js';
 
-export type JanusSettings = {
+export type ChaiSettings = {
   onboardingCompleted: boolean;
   theme: 'system' | 'light' | 'dark';
   llmModelPath: string | null;
@@ -13,7 +13,7 @@ export type JanusSettings = {
   freemiumBannerDismissed: boolean;
 };
 
-const DEFAULT_SETTINGS: JanusSettings = {
+const DEFAULT_SETTINGS: ChaiSettings = {
   onboardingCompleted: false,
   theme: 'system',
   llmModelPath: null,
@@ -27,7 +27,7 @@ const DEFAULT_SETTINGS: JanusSettings = {
 export const createSettingsStore = (input: { baseDir: string; logger: Logger }) => {
   const settingsPath = path.join(input.baseDir, 'settings.json');
 
-  const read = (): JanusSettings => {
+  const read = (): ChaiSettings => {
     if (!existsSync(settingsPath)) {
       writeFileSync(settingsPath, JSON.stringify(DEFAULT_SETTINGS, null, 2));
       return { ...DEFAULT_SETTINGS };
@@ -44,7 +44,7 @@ export const createSettingsStore = (input: { baseDir: string; logger: Logger }) 
     }
   };
 
-  const write = (patch: Partial<JanusSettings>): JanusSettings => {
+  const write = (patch: Partial<ChaiSettings>): ChaiSettings => {
     const current = read();
     const next = { ...current, ...patch };
     writeFileSync(settingsPath, JSON.stringify(next, null, 2));

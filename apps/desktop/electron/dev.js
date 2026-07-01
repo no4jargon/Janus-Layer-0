@@ -12,12 +12,13 @@ const uiRoot = path.join(repoRoot, 'packages', 'ui');
 
 const buildPackages = () => {
   const packages = [
-    '@janus/shared',
-    '@janus/db',
-    '@janus/core',
-    '@janus/ai',
-    '@janus/connectors-gmail',
-    '@janus/connectors-whatsapp',
+    '@chai/shared',
+    '@chai/db',
+    '@chai/core',
+    '@chai/ai-prompts',
+    '@chai/ai',
+    '@chai/connectors-gmail',
+    '@chai/connectors-whatsapp',
   ];
 
   const filterArgs = packages.flatMap((name) => ['--filter', name]);
@@ -64,7 +65,7 @@ const child = spawn(electron, ['./electron/main.js'], {
   env: {
     ...process.env,
     UI_DEV_URL: 'http://127.0.0.1:5173',
-    JANUS_REPO_ROOT: repoRoot,
+    CHAI_REPO_ROOT: repoRoot,
     NODE_ENV: 'development',
   },
 });

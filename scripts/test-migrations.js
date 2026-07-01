@@ -28,7 +28,7 @@ const fail = (message) => {
 const pass = (message) => console.log(`✔ ${message}`);
 
 const withTempDb = (fn) => {
-  const dir = mkdtempSync(path.join(tmpdir(), 'janus-migrations-'));
+  const dir = mkdtempSync(path.join(tmpdir(), 'chai-migrations-'));
   const dbPath = path.join(dir, 'app.db');
   try {
     return fn(dbPath);

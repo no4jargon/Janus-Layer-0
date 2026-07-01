@@ -12,13 +12,14 @@ const stagedUiDist = path.join(__dirname, 'ui-dist');
 const embeddedConfigPath = path.join(__dirname, 'embedded-config.json');
 
 const packages = [
-  '@janus/shared',
-  '@janus/db',
-  '@janus/core',
-  '@janus/ai',
-  '@janus/connectors-gmail',
-  '@janus/connectors-whatsapp',
-  '@janus/ui',
+  '@chai/shared',
+  '@chai/db',
+  '@chai/core',
+  '@chai/ai-prompts',
+  '@chai/ai',
+  '@chai/connectors-gmail',
+  '@chai/connectors-whatsapp',
+  '@chai/ui',
 ];
 
 const filterArgs = packages.flatMap((name) => `--filter ${name}`).join(' ');

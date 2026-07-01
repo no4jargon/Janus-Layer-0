@@ -129,6 +129,13 @@ export type WaMessageRecord = {
   mediaPath: string | null;
   mediaThumbDataUri: string | null;
   rawContent: string | null;
+  replyToStanzaId: string | null;
+  replyToParticipant: string | null;
+};
+
+export type WaMessageWithReply = WaMessageRecord & {
+  replyToText: string | null;
+  replyToSenderJid: string | null;
 };
 
 export type WaOutboxStatus = 'queued' | 'sending' | 'sent' | 'failed';

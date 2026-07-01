@@ -5,8 +5,8 @@ import {
   normalizeMessageContent,
 } from 'baileys';
 import type { WAMessage, WAMessageKey } from 'baileys';
-import type { WaMessageRecord } from '@janus/db';
-import { mkMessageKey } from '@janus/db';
+import type { WaMessageRecord } from '@chai/db';
+import { mkMessageKey } from '@chai/db';
 
 export const isInterestingJid = (jid: string | null | undefined): boolean => {
   if (!jid) return false;
@@ -53,6 +53,28 @@ export const getMessageTimestamp = (message: WAMessage): number => {
   return Number.isFinite(raw) && raw > 0 ? raw : Math.floor(Date.now() / 1000);
 };
 
+export const extractReplyContext = (
+  content: unknown,
+): { replyToStanzaId: string | null; replyToParticipant: string | null } => {
+  if (!content || typeof content !== 'object') {
+    return { replyToStanzaId: null, replyToParticipant: null };
+  }
+  for (const value of Object.values(content as Record<string, unknown>)) {
+    if (!value || typeof value !== 'object') continue;
+    const ctx = (value as { contextInfo?: { stanzaId?: unknown; participant?: unknown } })
+      .contextInfo;
+    if (!ctx || !ctx.stanzaId) continue;
+    return {
+      replyToStanzaId: String(ctx.stanzaId),
+      replyToParticipant:
+        typeof ctx.participant === 'string' && ctx.participant.length
+          ? ctx.participant
+          : null,
+    };
+  }
+  return { replyToStanzaId: null, replyToParticipant: null };
+};
+
 export const buildMessageRow = (message: WAMessage): WaMessageRecord => {
   const content = normalizeMessageContent(message.message);
   const messageType =
@@ -61,6 +83,7 @@ export const buildMessageRow = (message: WAMessage): WaMessageRecord => {
   const senderJid = key.fromMe
     ? key.remoteJid || null
     : key.participant || key.remoteJid || null;
+  const { replyToStanzaId, replyToParticipant } = extractReplyContext(content);
 
   return {
     messageKey: mkMessageKey(key),
@@ -79,6 +102,8 @@ export const buildMessageRow = (message: WAMessage): WaMessageRecord => {
     mediaPath: null,
     mediaThumbDataUri: null,
     rawContent: JSON.stringify(message),
+    replyToStanzaId,
+    replyToParticipant,
   };
 };
 

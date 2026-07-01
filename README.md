@@ -36,7 +36,7 @@ pnpm build              # builds all packages (TS -> dist) and the renderer
 pnpm dev                # starts Electron + Vite (auto-builds packages first)
 pnpm dev:ui             # renderer-only loop
 pnpm package:desktop    # produces an unsigned dir Electron build under apps/desktop/dist
-pnpm release:desktop    # signed installer build (needs JANUS_RELEASE=1, CSC_*/APPLE_* env)
+pnpm release:desktop    # signed installer build (needs CHAI_RELEASE=1, CSC_*/APPLE_* env)
 pnpm verify:data-paths  # smoke-tests dev/prod data paths + migrations
 pnpm test:migrations    # runs the migration test harness (fresh + idempotent + v1-upgrade)
 pnpm typecheck          # typecheck all packages
@@ -44,7 +44,7 @@ pnpm typecheck          # typecheck all packages
 
 See `docs/RELEASE.md` for signing + publish details, and `docs/QA_PLAN.md` for the friends/family beta checklist.
 
-`pnpm dev` triggers a one-shot build of `@janus/{shared,db,core,connectors-gmail,connectors-whatsapp}` and `chai` so the Electron main process can resolve them at runtime.
+`pnpm dev` triggers a one-shot build of `@chai/{shared,db,core,connectors-gmail,connectors-whatsapp}` and `chai` so the Electron main process can resolve them at runtime.
 
 ## Reset commands (macOS)
 

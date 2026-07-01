@@ -6,11 +6,11 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const desktopRoot = path.join(__dirname, '..');
 
-const isRelease = process.env.JANUS_RELEASE === '1';
-const isPublish = process.env.JANUS_PUBLISH === '1';
+const isRelease = process.env.CHAI_RELEASE === '1';
+const isPublish = process.env.CHAI_PUBLISH === '1';
 // In multi-platform CI, only one job (the macOS one) should write
 // latest.json. Other platform jobs set this to skip the write+upload.
-const skipLatestJson = process.env.JANUS_SKIP_LATEST_JSON === '1';
+const skipLatestJson = process.env.CHAI_SKIP_LATEST_JSON === '1';
 
 execSync('node ./electron/build.js', {
   cwd: desktopRoot,
@@ -46,7 +46,7 @@ if (isRelease && !skipLatestJson) {
   const version = pkg.version;
   const tag = `v${version}`;
   const minSupported = process.env.MIN_SUPPORTED_VERSION || version;
-  const channel = process.env.JANUS_RELEASE_CHANNEL || 'beta';
+  const channel = process.env.CHAI_RELEASE_CHANNEL || 'beta';
   const repoSlug = 'no4jargon/Janus-Layer-0';
 
   const latest = {

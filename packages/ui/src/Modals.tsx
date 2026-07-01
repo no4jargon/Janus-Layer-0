@@ -59,7 +59,7 @@ export const FreemiumModal = ({ onClose }: FreemiumModalProps) => {
         aria-label="Cross-platform sync"
       >
         <div className="modal-title-row">
-          <h3>Janus on your phone</h3>
+          <h3>Chai on your phone</h3>
           <button className="modal-close" onClick={onClose}>
             ✕
           </button>
@@ -155,7 +155,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     title: 'Get AI insights from your projects',
     emoji: '🧠',
-    body: 'Open the AI panel on the right. Pick a cluster and a time window, then click — Janus reads through every message in that window and extracts todos, deadlines, assignments, and updates. All inference runs locally; nothing leaves your device.',
+    body: 'Open the AI panel on the right. Pick a cluster and a time window, then click — Chai reads through every message in that window and extracts todos, deadlines, assignments, and updates. All inference runs locally; nothing leaves your device.',
     highlight: 'AI panel (right side) → Pick project → Run',
   },
 ];

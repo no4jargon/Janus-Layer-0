@@ -60,9 +60,9 @@ jobs:
           # electron-builder reads GH_TOKEN; the workflow's auto-injected
           # GITHUB_TOKEN already has `contents: write` from the permissions block.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          JANUS_RELEASE: '1'
-          JANUS_PUBLISH: '1'
-          JANUS_RELEASE_CHANNEL: ${{ inputs.channel || 'beta' }}
+          CHAI_RELEASE: '1'
+          CHAI_PUBLISH: '1'
+          CHAI_RELEASE_CHANNEL: ${{ inputs.channel || 'beta' }}
           MIN_SUPPORTED_VERSION: ${{ inputs.min_supported_version }}
         run: pnpm --filter chai release
 
@@ -108,12 +108,12 @@ jobs:
       - name: Build + publish Windows release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          JANUS_RELEASE: '1'
-          JANUS_PUBLISH: '1'
+          CHAI_RELEASE: '1'
+          CHAI_PUBLISH: '1'
           # macOS job is authoritative for latest.json; Windows just adds
           # the .exe to the same draft release.
-          JANUS_SKIP_LATEST_JSON: '1'
-          JANUS_RELEASE_CHANNEL: ${{ inputs.channel || 'beta' }}
+          CHAI_SKIP_LATEST_JSON: '1'
+          CHAI_RELEASE_CHANNEL: ${{ inputs.channel || 'beta' }}
           MIN_SUPPORTED_VERSION: ${{ inputs.min_supported_version }}
         run: pnpm --filter chai release
 

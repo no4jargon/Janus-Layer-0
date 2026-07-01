@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import type { Logger } from '@janus/core';
-import type { EmailOutboxMessageRecord, EmailStore } from '@janus/db';
+import type { Logger } from '@chai/core';
+import type { EmailOutboxMessageRecord, EmailStore } from '@chai/db';
 import {
   authedFetch,
   parseOauthConfig,

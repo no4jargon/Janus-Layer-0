@@ -1,5 +1,10 @@
 import { existsSync } from 'node:fs';
-import { WORKFLOW_PROMPT } from './workflow-prompt.js';
+import {
+  WORKFLOW_PROMPT,
+  type InferenceProvider,
+  type InferenceProviderOptions,
+  type InferenceResult,
+} from '@chai/ai-prompts';
 
 export type WorkflowExtractorOptions = {
   /** Absolute path to a local .gguf model. Overrides the bundled default. */
@@ -64,7 +69,7 @@ export const createWorkflowExtractor = (
   input: WorkflowExtractorOptions = {},
 ): WorkflowExtractor => {
   const explicitModelPath = trimOrNull(input.modelPath);
-  const envOverride = trimOrNull(process.env.JANUS_LLM_MODEL_PATH);
+  const envOverride = trimOrNull(process.env.CHAI_LLM_MODEL_PATH);
   const modelsDir = trimOrNull(input.modelsDir);
 
   const contextSize = input.contextSize ?? DEFAULT_CONTEXT_SIZE;
@@ -188,3 +193,46 @@ export const createWorkflowExtractor = (
     dispose,
   };
 };
+
+/**
+ * `InferenceProvider` adapter over `createWorkflowExtractor`. Same loading,
+ * extraction, and dispose logic as the existing factory — just exposed under
+ * the portable interface so the worker, control plane, and future API
+ * providers can be swapped in without touching call sites.
+ *
+ * `InferenceProviderOptions` (maxTokens / temperature / timeoutMs / signal)
+ * are currently fixed at extractor creation; per-call overrides will be
+ * threaded through when a consumer needs them.
+ */
+export class LocalLlamaCppProvider implements InferenceProvider {
+  readonly providerId = 'local-llama-cpp';
+  private readonly extractor: WorkflowExtractor;
+
+  constructor(input: WorkflowExtractorOptions = {}) {
+    this.extractor = createWorkflowExtractor(input);
+  }
+
+  resolvedModel(): string | null {
+    return this.extractor.resolvedModelPath();
+  }
+
+  async prepare(): Promise<void> {
+    await this.extractor.prepare();
+  }
+
+  async extract(
+    messageBody: string,
+    _opts?: InferenceProviderOptions,
+  ): Promise<InferenceResult> {
+    void _opts;
+    const text = await this.extractor.extract(messageBody);
+    return {
+      text,
+      model: this.extractor.resolvedModelPath() ?? DEFAULT_MODEL_URI,
+    };
+  }
+
+  async dispose(): Promise<void> {
+    await this.extractor.dispose();
+  }
+}

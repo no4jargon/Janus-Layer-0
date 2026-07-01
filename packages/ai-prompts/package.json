@@ -1,5 +1,5 @@
 {
-  "name": "@chai/db",
+  "name": "@chai/ai-prompts",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,8 +12,7 @@
     }
   },
   "files": [
-    "dist",
-    "migrations"
+    "dist"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

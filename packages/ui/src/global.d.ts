@@ -24,7 +24,7 @@ type SerializedMigrationFailure = {
   backupPath: string | null;
 };
 
-type JanusRuntimeSnapshot = {
+type ChaiRuntimeSnapshot = {
   appVersion: string;
   mode: RuntimeMode;
   phase: string;
@@ -185,24 +185,24 @@ declare global {
     | { kind: 'error'; message: string };
 
   interface Window {
-    janusMeta?: {
+    chaiMeta?: {
       platform: string;
       versions: Record<string, string>;
     };
-    janusApi?: {
-      getRuntimeState: () => Promise<JanusRuntimeSnapshot>;
+    chaiApi?: {
+      getRuntimeState: () => Promise<ChaiRuntimeSnapshot>;
       updateSettings: (
-        patch: Partial<JanusRuntimeSnapshot['settings']>,
-      ) => Promise<JanusRuntimeSnapshot>;
+        patch: Partial<ChaiRuntimeSnapshot['settings']>,
+      ) => Promise<ChaiRuntimeSnapshot>;
       connectConnector: (
         connector: ConnectorKind,
-      ) => Promise<JanusRuntimeSnapshot>;
+      ) => Promise<ChaiRuntimeSnapshot>;
       disconnectConnector: (
         connector: ConnectorKind,
-      ) => Promise<JanusRuntimeSnapshot>;
+      ) => Promise<ChaiRuntimeSnapshot>;
       syncConnector: (
         connector: ConnectorKind,
-      ) => Promise<JanusRuntimeSnapshot>;
+      ) => Promise<ChaiRuntimeSnapshot>;
       gmail: {
         listThreads: () => Promise<EmailThreadSummary[]>;
         getThread: (
@@ -304,7 +304,7 @@ declare global {
         listOutputs: (clusterId: string) => Promise<unknown[]>;
       };
       migration: {
-        retry: () => Promise<JanusRuntimeSnapshot>;
+        retry: () => Promise<ChaiRuntimeSnapshot>;
       };
       diagnostics: {
         export: () => Promise<{ saved: boolean; savedPath?: string }>;
@@ -322,7 +322,7 @@ declare global {
       };
       events: {
         onRuntimeSnapshot: (
-          handler: (snapshot: JanusRuntimeSnapshot) => void,
+          handler: (snapshot: ChaiRuntimeSnapshot) => void,
         ) => () => void;
         onWhatsAppEvent: (handler: (event: WaEvent) => void) => () => void;
         onConnectorEvent: (

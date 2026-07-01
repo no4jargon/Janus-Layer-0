@@ -7,25 +7,26 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import {
   buildDiagnosticsBundle,
   createUpdateChecker,
-  createJanusRuntime,
-} from '@janus/core';
+  createChaiRuntime,
+} from '@chai/core';
 import {
   createAiOutputStore,
   createClusterStore,
   createEmailStore,
   createWhatsAppStore,
-} from '@janus/db';
+} from '@chai/db';
 import {
   createGmailConnector,
   createGmailSendService,
-} from '@janus/connectors-gmail';
+} from '@chai/connectors-gmail';
 import {
+  createDesktopBaileysSessionAdapter,
   createWhatsAppConnector,
   createWhatsAppSendService,
-} from '@janus/connectors-whatsapp';
-import { createWorkflowExtractor } from '@janus/ai';
+} from '@chai/connectors-whatsapp';
+import { createWorkflowExtractor } from '@chai/ai';
 import electronUpdater from 'electron-updater';
-import { loadJanusEnv } from './env.js';
+import { loadChaiEnv } from './env.js';
 
 const { autoUpdater } = electronUpdater;
 
@@ -50,9 +51,9 @@ let lastUpdateInfo = null;
 let updatePollTimer = null;
 
 // How often to poll the update feed while the app is running.
-// Override with JANUS_UPDATE_POLL_MS for testing.
+// Override with CHAI_UPDATE_POLL_MS for testing.
 const UPDATE_POLL_INTERVAL_MS = Number(
-  process.env.JANUS_UPDATE_POLL_MS || 60 * 60 * 1000,
+  process.env.CHAI_UPDATE_POLL_MS || 60 * 60 * 1000,
 );
 
 const broadcastEvent = (channel, payload) => {
@@ -62,7 +63,7 @@ const broadcastEvent = (channel, payload) => {
 
 const broadcastSnapshot = () => {
   if (!runtime) return;
-  broadcastEvent('janus:runtime-snapshot', runtime.getSnapshot());
+  broadcastEvent('chai:runtime-snapshot', runtime.getSnapshot());
 };
 
 const createMainWindow = async () => {
@@ -111,42 +112,42 @@ const newId = (prefix) =>
   `${prefix}_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
 
 const registerIpcHandlers = () => {
-  ipcMain.handle('janus:get-runtime-state', () =>
+  ipcMain.handle('chai:get-runtime-state', () =>
     requireRuntime().getSnapshot(),
   );
 
-  ipcMain.handle('janus:update-settings', (_event, patch) => {
+  ipcMain.handle('chai:update-settings', (_event, patch) => {
     const current = requireRuntime().settingsStore.write(patch || {});
     rebuildWorkflowExtractor(current);
     broadcastSnapshot();
     return runtime.getSnapshot();
   });
 
-  ipcMain.handle('janus:connector:connect', async (_event, connector) => {
+  ipcMain.handle('chai:connector:connect', async (_event, connector) => {
     await requireRuntime().connectorRuntime.connect(connector);
     broadcastSnapshot();
     return runtime.getSnapshot();
   });
 
-  ipcMain.handle('janus:connector:disconnect', async (_event, connector) => {
+  ipcMain.handle('chai:connector:disconnect', async (_event, connector) => {
     await requireRuntime().connectorRuntime.disconnect(connector);
     broadcastSnapshot();
     return runtime.getSnapshot();
   });
 
-  ipcMain.handle('janus:connector:sync', async (_event, connector) => {
-    broadcastEvent('janus:connector:event', {
+  ipcMain.handle('chai:connector:sync', async (_event, connector) => {
+    broadcastEvent('chai:connector:event', {
       connector,
       type: 'sync.started',
     });
     try {
       await requireRuntime().connectorRuntime.syncNow(connector);
-      broadcastEvent('janus:connector:event', {
+      broadcastEvent('chai:connector:event', {
         connector,
         type: 'sync.completed',
       });
     } catch (error) {
-      broadcastEvent('janus:connector:event', {
+      broadcastEvent('chai:connector:event', {
         connector,
         type: 'sync.failed',
         error: error instanceof Error ? error.message : String(error),
@@ -156,13 +157,13 @@ const registerIpcHandlers = () => {
     return runtime.getSnapshot();
   });
 
-  ipcMain.handle('janus:gmail:list-threads', () => {
+  ipcMain.handle('chai:gmail:list-threads', () => {
     if (!runtime) return [];
     const store = createEmailStore(runtime.db);
     return store.getEmailThreads('local-user');
   });
 
-  ipcMain.handle('janus:gmail:get-thread', (_event, threadId) => {
+  ipcMain.handle('chai:gmail:get-thread', (_event, threadId) => {
     if (!runtime) return null;
     const store = createEmailStore(runtime.db);
     const thread = store.getEmailThreadById(threadId);
@@ -175,12 +176,12 @@ const registerIpcHandlers = () => {
     return { thread, messages: messagesWithAttachments };
   });
 
-  ipcMain.handle('janus:gmail:send', async (_event, payload) => {
+  ipcMain.handle('chai:gmail:send', async (_event, payload) => {
     if (!gmailSendService) {
       throw new Error('Gmail send service is not available.');
     }
     const result = await gmailSendService.sendEmail(payload);
-    broadcastEvent('janus:gmail:event', {
+    broadcastEvent('chai:gmail:event', {
       type: 'send.completed',
       payload: result,
     });
@@ -188,7 +189,7 @@ const registerIpcHandlers = () => {
   });
 
   ipcMain.handle(
-    'janus:gmail:download-attachment',
+    'chai:gmail:download-attachment',
     async (_event, attachmentId) => {
       if (!gmailConnector) throw new Error('Gmail connector unavailable.');
       const file = await gmailConnector.getAttachmentContent(attachmentId);
@@ -206,7 +207,7 @@ const registerIpcHandlers = () => {
   );
 
   ipcMain.handle(
-    'janus:gmail:open-attachment',
+    'chai:gmail:open-attachment',
     async (_event, attachmentId) => {
       if (!gmailConnector) throw new Error('Gmail connector unavailable.');
       const file = await gmailConnector.getAttachmentContent(attachmentId);
@@ -215,34 +216,37 @@ const registerIpcHandlers = () => {
     },
   );
 
-  ipcMain.handle('janus:whatsapp:list-chats', () => {
+  ipcMain.handle('chai:whatsapp:list-chats', () => {
     if (!runtime) return [];
     const store = createWhatsAppStore(runtime.db);
     return store.getChats();
   });
 
-  ipcMain.handle('janus:whatsapp:get-chat', (_event, jid) => {
+  ipcMain.handle('chai:whatsapp:get-chat', (_event, jid) => {
     if (!runtime) return [];
     const store = createWhatsAppStore(runtime.db);
-    const messages = store.getMessagesForChat(jid, 200);
+    const messages = store.getMessagesForChatWithReplies(jid, 200);
     return messages.map((message) => ({
       ...message,
       senderName: store.resolveDisplayName(message.participant ?? message.senderJid),
+      replyToSenderName: message.replyToSenderJid
+        ? store.resolveDisplayName(message.replyToSenderJid)
+        : null,
     }));
   });
 
-  ipcMain.handle('janus:whatsapp:send', async (_event, payload) => {
+  ipcMain.handle('chai:whatsapp:send', async (_event, payload) => {
     if (!whatsappSendService) {
       throw new Error('WhatsApp send service is not available.');
     }
     return whatsappSendService.sendText(payload);
   });
 
-  ipcMain.handle('janus:whatsapp:status', () => {
+  ipcMain.handle('chai:whatsapp:status', () => {
     return whatsappConnector?.getStatus() ?? null;
   });
 
-  ipcMain.handle('janus:cluster:list', () => {
+  ipcMain.handle('chai:cluster:list', () => {
     if (!runtime) return { clusters: [], clusterMap: {} };
     const store = createClusterStore(runtime.db);
     return {
@@ -251,7 +255,7 @@ const registerIpcHandlers = () => {
     };
   });
 
-  ipcMain.handle('janus:cluster:create', (_event, input) => {
+  ipcMain.handle('chai:cluster:create', (_event, input) => {
     const store = createClusterStore(requireRuntime().db);
     const id = newId('cluster');
     const cluster = store.create({
@@ -268,18 +272,18 @@ const registerIpcHandlers = () => {
     };
   });
 
-  ipcMain.handle('janus:cluster:rename', (_event, input) => {
+  ipcMain.handle('chai:cluster:rename', (_event, input) => {
     const store = createClusterStore(requireRuntime().db);
     return store.rename(input.id, input.name, input.color ?? null);
   });
 
-  ipcMain.handle('janus:cluster:delete', (_event, id) => {
+  ipcMain.handle('chai:cluster:delete', (_event, id) => {
     const store = createClusterStore(requireRuntime().db);
     store.remove(id);
     return { clusterMap: store.getClusterMap() };
   });
 
-  ipcMain.handle('janus:cluster:add-members', (_event, input) => {
+  ipcMain.handle('chai:cluster:add-members', (_event, input) => {
     const store = createClusterStore(requireRuntime().db);
     store.addMembers(input.clusterId, input.members || []);
     return {
@@ -288,29 +292,29 @@ const registerIpcHandlers = () => {
     };
   });
 
-  ipcMain.handle('janus:cluster:remove-member', (_event, input) => {
+  ipcMain.handle('chai:cluster:remove-member', (_event, input) => {
     const store = createClusterStore(requireRuntime().db);
     store.removeMember(input.clusterId, input.source, input.sourceRef);
     return { clusterMap: store.getClusterMap() };
   });
 
-  ipcMain.handle('janus:cluster:list-members', (_event, clusterId) => {
+  ipcMain.handle('chai:cluster:list-members', (_event, clusterId) => {
     const store = createClusterStore(requireRuntime().db);
     return store.listMembers(clusterId);
   });
 
-  ipcMain.handle('janus:cluster:clear-all', () => {
+  ipcMain.handle('chai:cluster:clear-all', () => {
     const store = createClusterStore(requireRuntime().db);
     store.clearAll();
     return { clusterMap: {}, clusters: [] };
   });
 
-  ipcMain.handle('janus:ai:extract-workflow', async (_event, text) => {
+  ipcMain.handle('chai:ai:extract-workflow', async (_event, text) => {
     if (!workflowExtractor) throw new Error('AI runtime unavailable.');
     return workflowExtractor.extract(text);
   });
 
-  ipcMain.handle('janus:ai:choose-model-file', async () => {
+  ipcMain.handle('chai:ai:choose-model-file', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       title: 'Choose a local LLM model (.gguf)',
       properties: ['openFile'],
@@ -325,7 +329,7 @@ const registerIpcHandlers = () => {
     return { canceled: false, path: result.filePaths[0] };
   });
 
-  ipcMain.handle('janus:ai:save-output', (_event, input) => {
+  ipcMain.handle('chai:ai:save-output', (_event, input) => {
     const store = createAiOutputStore(requireRuntime().db);
     return store.create({
       id: newId('ai_output'),
@@ -337,12 +341,12 @@ const registerIpcHandlers = () => {
     });
   });
 
-  ipcMain.handle('janus:ai:list-outputs', (_event, clusterId) => {
+  ipcMain.handle('chai:ai:list-outputs', (_event, clusterId) => {
     const store = createAiOutputStore(requireRuntime().db);
     return store.listForCluster(clusterId);
   });
 
-  ipcMain.handle('janus:diagnostics:export', async () => {
+  ipcMain.handle('chai:diagnostics:export', async () => {
     const r = requireRuntime();
     const bundle = buildDiagnosticsBundle({
       appVersion: app.getVersion(),
@@ -354,7 +358,7 @@ const registerIpcHandlers = () => {
 
     const result = await dialog.showSaveDialog(mainWindow, {
       title: 'Save diagnostics bundle',
-      defaultPath: `janus-diagnostics-${new Date()
+      defaultPath: `chai-diagnostics-${new Date()
         .toISOString()
         .replace(/[:.]/g, '-')}.json`,
       filters: [{ name: 'JSON', extensions: ['json'] }],
@@ -366,11 +370,11 @@ const registerIpcHandlers = () => {
     return { saved: true, savedPath: result.filePath };
   });
 
-  ipcMain.handle('janus:update:check', async (_event, input) => {
+  ipcMain.handle('chai:update:check', async (_event, input) => {
     return runUpdateCheck(input);
   });
 
-  ipcMain.handle('janus:update:download', async () => {
+  ipcMain.handle('chai:update:download', async () => {
     if (isDev) {
       return {
         kind: 'skipped',
@@ -385,12 +389,12 @@ const registerIpcHandlers = () => {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : String(error);
-      broadcastEvent('janus:update:event', { kind: 'error', message });
+      broadcastEvent('chai:update:event', { kind: 'error', message });
       return { kind: 'error', message };
     }
   });
 
-  ipcMain.handle('janus:update:install', () => {
+  ipcMain.handle('chai:update:install', () => {
     if (isDev) {
       return {
         kind: 'skipped',
@@ -401,9 +405,9 @@ const registerIpcHandlers = () => {
     return { kind: 'installing' };
   });
 
-  ipcMain.handle('janus:update:last', () => lastUpdateInfo);
+  ipcMain.handle('chai:update:last', () => lastUpdateInfo);
 
-  ipcMain.handle('janus:migration:retry', async () => {
+  ipcMain.handle('chai:migration:retry', async () => {
     runtime?.close();
     runtime = await createRuntime();
     rebuildWorkflowExtractor(runtime.settingsStore.read());
@@ -418,7 +422,7 @@ const rebuildWorkflowExtractor = (settings) => {
     modelPath: settings?.llmModelPath || undefined,
     modelsDir: runtime?.paths?.modelsDir,
     onModelDownloadProgress: ({ transferredBytes, totalBytes }) => {
-      broadcastEvent('janus:ai:model-download', {
+      broadcastEvent('chai:ai:model-download', {
         transferredBytes,
         totalBytes,
       });
@@ -451,15 +455,15 @@ const configureAutoUpdater = () => {
 
   // electron-updater reads provider/owner/repo from the bundled app-update.yml
   // (built from build.publish in package.json). Don't override here — the
-  // JANUS_UPDATE_FEED_URL env var only drives the JSON metadata feed used
+  // CHAI_UPDATE_FEED_URL env var only drives the JSON metadata feed used
   // by createUpdateChecker for forced-update enforcement.
 
   autoUpdater.on('checking-for-update', () => {
-    broadcastEvent('janus:update:event', { kind: 'checking' });
+    broadcastEvent('chai:update:event', { kind: 'checking' });
   });
 
   autoUpdater.on('update-available', (info) => {
-    broadcastEvent('janus:update:event', {
+    broadcastEvent('chai:update:event', {
       kind: 'available',
       version: info?.version,
       releaseDate: info?.releaseDate,
@@ -468,21 +472,21 @@ const configureAutoUpdater = () => {
   });
 
   autoUpdater.on('update-not-available', (info) => {
-    broadcastEvent('janus:update:event', {
+    broadcastEvent('chai:update:event', {
       kind: 'not-available',
       version: info?.version,
     });
   });
 
   autoUpdater.on('error', (error) => {
-    broadcastEvent('janus:update:event', {
+    broadcastEvent('chai:update:event', {
       kind: 'error',
       message: error instanceof Error ? error.message : String(error),
     });
   });
 
   autoUpdater.on('download-progress', (progress) => {
-    broadcastEvent('janus:update:event', {
+    broadcastEvent('chai:update:event', {
       kind: 'progress',
       percent: progress.percent,
       bytesPerSecond: progress.bytesPerSecond,
@@ -492,7 +496,7 @@ const configureAutoUpdater = () => {
   });
 
   autoUpdater.on('update-downloaded', (info) => {
-    broadcastEvent('janus:update:event', {
+    broadcastEvent('chai:update:event', {
       kind: 'downloaded',
       version: info?.version,
     });
@@ -505,7 +509,7 @@ const DEFAULT_UPDATE_FEED_URL =
 const runUpdateCheck = async (input) => {
   const feedUrl =
     input?.feedUrl ||
-    process.env.JANUS_UPDATE_FEED_URL ||
+    process.env.CHAI_UPDATE_FEED_URL ||
     DEFAULT_UPDATE_FEED_URL;
   const checker = createUpdateChecker({
     feedUrl,
@@ -515,7 +519,7 @@ const runUpdateCheck = async (input) => {
   try {
     const info = await checker.check();
     lastUpdateInfo = info;
-    broadcastEvent('janus:update:event', {
+    broadcastEvent('chai:update:event', {
       kind: 'check-result',
       info,
     });
@@ -545,12 +549,12 @@ const seedEmbeddedConfig = () => {
 
 const createRuntime = async () => {
   const repoRoot =
-    process.env.JANUS_REPO_ROOT || path.join(__dirname, '..', '..', '..');
+    process.env.CHAI_REPO_ROOT || path.join(__dirname, '..', '..', '..');
 
-  loadJanusEnv(repoRoot);
+  loadChaiEnv(repoRoot);
   seedEmbeddedConfig();
 
-  return createJanusRuntime({
+  return createChaiRuntime({
     mode: isDev ? 'development' : 'production',
     repoRoot,
     userDataPath: app.getPath('userData'),
@@ -579,9 +583,9 @@ const createRuntime = async () => {
       whatsappConnector = createWhatsAppConnector({
         keystoreDir: paths.keystoreDir,
         logger,
-        store: whatsappStore,
+        adapter: createDesktopBaileysSessionAdapter(whatsappStore),
         onEvent: (event) => {
-          broadcastEvent('janus:whatsapp:event', event);
+          broadcastEvent('chai:whatsapp:event', event);
         },
       });
 

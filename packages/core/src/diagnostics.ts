@@ -5,13 +5,13 @@ import {
   statSync,
 } from 'node:fs';
 import path from 'node:path';
-import type { Database } from '@janus/db';
+import type { Database } from '@chai/db';
 import type { AppDataPaths, RuntimeMode } from './data-paths.js';
-import type { JanusSettings } from './settings-store.js';
+import type { ChaiSettings } from './settings-store.js';
 
-const SETTING_REDACTIONS: Array<keyof JanusSettings> = [];
+const SETTING_REDACTIONS: Array<keyof ChaiSettings> = [];
 
-const sanitizeSettings = (settings: JanusSettings): JanusSettings => {
+const sanitizeSettings = (settings: ChaiSettings): ChaiSettings => {
   const copy = { ...settings };
   for (const key of SETTING_REDACTIONS) {
     (copy as Record<string, unknown>)[key as string] = null;
@@ -28,7 +28,7 @@ export type DiagnosticsBundle = {
     nodeVersion: string;
   };
   paths: AppDataPaths;
-  settings: JanusSettings;
+  settings: ChaiSettings;
   schemaMigrations: Array<{ id: string; appliedAt: string }>;
   connectors: Array<{
     connector: string;
@@ -45,7 +45,7 @@ export type BuildDiagnosticsInput = {
   appVersion: string;
   mode: RuntimeMode;
   paths: AppDataPaths;
-  settings: JanusSettings;
+  settings: ChaiSettings;
   db: Database;
   logTailLines?: number;
 };

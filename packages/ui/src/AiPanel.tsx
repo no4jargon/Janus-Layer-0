@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { buildClusterPrompt, type CollatedMessage } from '@chai/ai-prompts';
 import { clusterDot } from './lib/cluster-colors';
 import {
   LOOKBACK_HOURS_OPTIONS,
-  MAX_CLUSTER_TEXT_CHARS,
   renderCollatedClusterOutput,
   type ClusterRunResult,
 } from './lib/workflow-output';
@@ -57,6 +57,9 @@ type WaThreadMessage = {
   isDeleted: boolean;
   text: string;
   messageTimestamp: number;
+  replyToText: string | null;
+  replyToSenderJid: string | null;
+  replyToSenderName: string | null;
 };
 
 type EmailThreadMessage = {
@@ -88,27 +91,40 @@ const senderLabelEmail = (message: EmailThreadMessage): string => {
     : message.senderEmail;
 };
 
+const MAX_QUOTED_PARENT_CHARS = 200;
+
+const formatQuotedParent = (message: WaThreadMessage): string => {
+  if (!message.replyToText) return '';
+  const sender =
+    message.replyToSenderName ||
+    message.replyToSenderJid ||
+    'Unknown';
+  const trimmed = message.replyToText.replace(/\s+/g, ' ').trim();
+  if (!trimmed) return '';
+  const truncated =
+    trimmed.length > MAX_QUOTED_PARENT_CHARS
+      ? `${trimmed.slice(0, MAX_QUOTED_PARENT_CHARS - 1)}…`
+      : trimmed;
+  return `> ${sender}: ${truncated}\n`;
+};
+
 const fetchItemMessages = async (
   item: { sourceType: SourceType; id: string },
-): Promise<
-  Array<{
-    sourceType: SourceType;
-    timestampSec: number;
-    sender: string;
-    text: string;
-  }>
-> => {
-  const api = window.janusApi;
+): Promise<CollatedMessage[]> => {
+  const api = window.chaiApi;
   if (!api) return [];
 
   if (item.sourceType === 'whatsapp_chat') {
     const messages = (await api.whatsapp.getChat(item.id)) as WaThreadMessage[];
-    return messages.map((message) => ({
-      sourceType: 'whatsapp_chat' as const,
-      timestampSec: Number(message.messageTimestamp || 0),
-      sender: senderLabelWhatsapp(message),
-      text: message.isDeleted ? '' : String(message.text || ''),
-    }));
+    return messages.map((message) => {
+      const body = message.isDeleted ? '' : String(message.text || '');
+      return {
+        sourceType: 'whatsapp_chat' as const,
+        timestampSec: Number(message.messageTimestamp || 0),
+        sender: senderLabelWhatsapp(message),
+        text: body ? `${formatQuotedParent(message)}${body}` : body,
+      };
+    });
   }
 
   const payload = await api.gmail.getThread(item.id);
@@ -138,40 +154,20 @@ const collectClusterPromptPayload = async (
     return { ok: false, reason: 'empty_cluster' };
   }
 
-  const windowStartMs = Date.now() - lookbackHours * 60 * 60 * 1000;
   const settled = await Promise.all(
     clusterItems.map((item) => fetchItemMessages(item)),
   );
-  const allMessages = settled
-    .flat()
-    .filter((message) => message.timestampSec > 0 && message.text)
-    .filter((message) => message.timestampSec * 1000 >= windowStartMs)
-    .sort((a, b) => a.timestampSec - b.timestampSec);
-
-  if (!allMessages.length) {
-    return { ok: false, reason: 'empty_window' };
-  }
-
-  let charsUsed = 0;
-  let includedCount = 0;
-  const lines: string[] = [];
-  for (const message of allMessages) {
-    const line = `[${new Date(message.timestampSec * 1000).toISOString()}] (${message.sourceType}) ${message.sender}: ${message.text}`;
-    if (charsUsed + line.length + 1 > MAX_CLUSTER_TEXT_CHARS) break;
-    lines.push(line);
-    charsUsed += line.length + 1;
-    includedCount += 1;
-  }
-
-  if (!lines.length) {
-    return { ok: false, reason: 'token_budget' };
-  }
+  const result = buildClusterPrompt({
+    messages: settled.flat(),
+    lookbackHours,
+  });
+  if (!result.ok) return result;
 
   return {
     ok: true,
     cluster,
-    promptText: lines.join('\n'),
-    includedCount,
+    promptText: result.promptText,
+    includedCount: result.includedCount,
   };
 };
 
@@ -243,7 +239,7 @@ export const AiPanel = ({
   } | null>(null);
 
   useEffect(() => {
-    const api = window.janusApi;
+    const api = window.chaiApi;
     if (!api) return;
     return api.events.onModelDownload((status) => {
       setModelDownload(status);
@@ -327,7 +323,7 @@ export const AiPanel = ({
         return;
       }
 
-      const result = await window.janusApi!.ai.extractWorkflow(
+      const result = await window.chaiApi!.ai.extractWorkflow(
         payload.promptText,
       );
       const summary = [
@@ -339,7 +335,7 @@ export const AiPanel = ({
       setStatus('Cluster extraction complete.');
 
       try {
-        await window.janusApi!.ai.saveOutput({
+        await window.chaiApi!.ai.saveOutput({
           clusterId: selectedCluster.id,
           kind: 'workflow.cluster',
           inputSummary: `messages=${payload.includedCount} hours=${selectedHours}`,
@@ -411,7 +407,7 @@ export const AiPanel = ({
           });
         } else {
           try {
-            const out = await window.janusApi!.ai.extractWorkflow(
+            const out = await window.chaiApi!.ai.extractWorkflow(
               payload.promptText,
             );
             results.push({
@@ -449,7 +445,7 @@ export const AiPanel = ({
         const hoursSummary = isSinceLastOpened
           ? `since-last-opened(${effectiveLookbackHours.toFixed(2)}h)`
           : `${effectiveLookbackHours}h`;
-        await window.janusApi!.ai.saveOutput({
+        await window.chaiApi!.ai.saveOutput({
           clusterId: null,
           kind: 'workflow.all-clusters',
           inputSummary: `clusters=${sortedClusters.length} hours=${hoursSummary}`,

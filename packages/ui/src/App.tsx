@@ -8,7 +8,7 @@ const MigrationFailureScreen = ({
 }: {
   failure: NonNullable<
     Awaited<
-      ReturnType<NonNullable<typeof window.janusApi>['getRuntimeState']>
+      ReturnType<NonNullable<typeof window.chaiApi>['getRuntimeState']>
     >['migrationFailure']
   >;
 }) => {
@@ -16,11 +16,11 @@ const MigrationFailureScreen = ({
   const [error, setError] = useState<string | null>(null);
 
   const onRetry = async () => {
-    if (!window.janusApi) return;
+    if (!window.chaiApi) return;
     setRetrying(true);
     setError(null);
     try {
-      await window.janusApi.migration.retry();
+      await window.chaiApi.migration.retry();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -69,13 +69,13 @@ export const App = () => {
   const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
 
   useEffect(() => {
-    if (!window.janusApi) return;
+    if (!window.chaiApi) return;
 
-    void window.janusApi.update.lastInfo().then((value) => {
+    void window.chaiApi.update.lastInfo().then((value) => {
       if (value) setUpdateInfo(value);
     });
 
-    return window.janusApi.events.onUpdateEvent((event) => {
+    return window.chaiApi.events.onUpdateEvent((event) => {
       if (event.kind === 'check-result') {
         setUpdateInfo(event.info);
       }

@@ -16,3 +16,10 @@ export {
   parseTextFromMessage,
   getMessageTimestamp,
 } from './message-parser.js';
+export {
+  type BaileysSessionAdapter,
+  type WaChatUpsert,
+  type WaContactUpsert,
+  type WaMessagePatch,
+} from './baileys-session-adapter.js';
+export { createDesktopBaileysSessionAdapter } from './desktop-store-adapter.js';

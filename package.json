@@ -1,5 +1,5 @@
 {
-  "name": "janus-layer-0",
+  "name": "chai",
   "version": "0.1.0",
   "private": true,
   "description": "Desktop-first, local-first communications workspace",
@@ -7,7 +7,7 @@
   "packageManager": "pnpm@10.12.1",
   "scripts": {
     "dev": "pnpm --filter chai dev",
-    "dev:ui": "pnpm --filter @janus/ui dev",
+    "dev:ui": "pnpm --filter @chai/ui dev",
     "build": "pnpm -r build",
     "package:desktop": "pnpm --filter chai package",
     "release:desktop": "pnpm --filter chai release",
@@ -15,7 +15,7 @@
     "app:rebuild-fresh": "rm -rf \"$HOME/Library/Application Support/Chai\" && pnpm --filter chai package",
     "db:wipe": "rm -f \"$HOME/Library/Application Support/Chai/data/app.db\" \"$HOME/Library/Application Support/Chai/data/app.db-shm\" \"$HOME/Library/Application Support/Chai/data/app.db-wal\"",
     "verify:data-paths": "pnpm --filter chai verify:data-paths",
-    "test:migrations": "pnpm --filter @janus/db build && node ./scripts/test-migrations.js",
+    "test:migrations": "pnpm --filter @chai/db build && node ./scripts/test-migrations.js",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {

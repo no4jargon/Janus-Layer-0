@@ -31,7 +31,7 @@ import { buildClientRequestId } from './lib/workflow-output';
 import { useConnectorEvents, useWhatsAppEvents } from './lib/use-runtime';
 
 type Snapshot = Awaited<
-  ReturnType<NonNullable<typeof window.janusApi>['getRuntimeState']>
+  ReturnType<NonNullable<typeof window.chaiApi>['getRuntimeState']>
 >;
 
 type WaThreadMessage = {
@@ -44,6 +44,9 @@ type WaThreadMessage = {
   isDeleted: boolean;
   text: string;
   messageTimestamp: number;
+  replyToText: string | null;
+  replyToSenderJid: string | null;
+  replyToSenderName: string | null;
   __kind: 'whatsapp';
 };
 
@@ -231,6 +234,7 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
   const [chatFilter, setChatFilter] = useState<
     'all' | 'unread' | 'favorites' | 'groups'
   >('all');
+  const [waSearch, setWaSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'whatsapp' | 'email' | 'clusters'>(
     'whatsapp',
   );
@@ -359,29 +363,29 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
   }, [connectorSummary.whatsappStatus]);
 
   const refreshClusters = useCallback(async () => {
-    if (!window.janusApi) return;
-    const result = await window.janusApi.cluster.list();
+    if (!window.chaiApi) return;
+    const result = await window.chaiApi.cluster.list();
     setClusters(result.clusters);
     setClusterMap(result.clusterMap);
   }, []);
 
   const loadWhatsappChats = useCallback(async () => {
-    if (!window.janusApi) return;
-    const chats = await window.janusApi.whatsapp.listChats();
+    if (!window.chaiApi) return;
+    const chats = await window.chaiApi.whatsapp.listChats();
     setWhatsappChats(chats.map(toListItemWhatsapp));
   }, []);
 
   const loadEmailThreads = useCallback(async () => {
-    if (!window.janusApi) return;
-    const threads = await window.janusApi.gmail.listThreads();
+    if (!window.chaiApi) return;
+    const threads = await window.chaiApi.gmail.listThreads();
     setEmailThreads(threads.map(toListItemEmail));
   }, []);
 
   const refreshAll = useCallback(async () => {
-    if (!window.janusApi) return;
+    if (!window.chaiApi) return;
     await Promise.allSettled([
-      window.janusApi.syncConnector('gmail'),
-      window.janusApi.syncConnector('whatsapp'),
+      window.chaiApi.syncConnector('gmail'),
+      window.chaiApi.syncConnector('whatsapp'),
     ]);
     await Promise.all([
       loadWhatsappChats(),
@@ -391,16 +395,16 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
   }, [loadEmailThreads, loadWhatsappChats, refreshClusters]);
 
   const loadWhatsappThread = useCallback(async (jid: string) => {
-    if (!window.janusApi) return;
-    const messages = await window.janusApi.whatsapp.getChat(jid);
+    if (!window.chaiApi) return;
+    const messages = await window.chaiApi.whatsapp.getChat(jid);
     setThreadMessages(
       messages.map((message) => ({ ...message, __kind: 'whatsapp' }) as WaThreadMessage),
     );
   }, []);
 
   const loadEmailThread = useCallback(async (threadId: string) => {
-    if (!window.janusApi) return;
-    const payload = await window.janusApi.gmail.getThread(threadId);
+    if (!window.chaiApi) return;
+    const payload = await window.chaiApi.gmail.getThread(threadId);
     if (!payload) {
       setThreadMessages([]);
       return;
@@ -492,7 +496,7 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
 
   // Subscribe to WhatsApp events for live updates
   const onWaEvent = useCallback(
-    (event: Parameters<NonNullable<typeof window.janusApi>['events']['onWhatsAppEvent']>[0] extends (e: infer T) => void ? T : never) => {
+    (event: Parameters<NonNullable<typeof window.chaiApi>['events']['onWhatsAppEvent']>[0] extends (e: infer T) => void ? T : never) => {
       if (event.type === 'qr') {
         setWaQr(event.payload.qr);
         setWaConnectionText('Scan QR to login');
@@ -598,7 +602,7 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
   );
 
   const onCreateCluster = useCallback(async () => {
-    if (!selectedItems.size || !window.janusApi) return;
+    if (!selectedItems.size || !window.chaiApi) return;
     const rawName = await showPrompt('Cluster name?');
     if (rawName === null) return;
     const name = rawName.trim();
@@ -621,7 +625,7 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
         (entry): entry is { source: 'gmail' | 'whatsapp'; sourceRef: string } => !!entry,
       );
 
-    await window.janusApi.cluster.create({ name, color: colorId, members });
+    await window.chaiApi.cluster.create({ name, color: colorId, members });
     setSelectedItems(new Set());
     lastAnchorIndexRef.current = null;
     await refreshClusters();
@@ -629,12 +633,12 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
 
   const onRenameCluster = useCallback(
     async (cluster: ClusterRecord) => {
-      if (!window.janusApi) return;
+      if (!window.chaiApi) return;
       const next = await showPrompt('Rename cluster', cluster.name);
       if (next === null) return;
       const trimmed = next.trim();
       if (!trimmed) return;
-      await window.janusApi.cluster.rename({
+      await window.chaiApi.cluster.rename({
         id: cluster.id,
         name: trimmed,
       });
@@ -645,8 +649,8 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
 
   const onRecolorCluster = useCallback(
     async (cluster: ClusterRecord, color: string) => {
-      if (!window.janusApi) return;
-      await window.janusApi.cluster.rename({
+      if (!window.chaiApi) return;
+      await window.chaiApi.cluster.rename({
         id: cluster.id,
         name: cluster.name,
         color,
@@ -658,20 +662,20 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
 
   const onDeleteCluster = useCallback(
     async (cluster: ClusterRecord) => {
-      if (!window.janusApi) return;
+      if (!window.chaiApi) return;
       if (!window.confirm(`Delete cluster "${cluster.name}"? Members will be unassigned.`)) {
         return;
       }
-      await window.janusApi.cluster.remove(cluster.id);
+      await window.chaiApi.cluster.remove(cluster.id);
       await refreshClusters();
     },
     [refreshClusters],
   );
 
   const clearAllClusters = useCallback(async () => {
-    if (!window.janusApi) return;
+    if (!window.chaiApi) return;
     if (!window.confirm('Clear all clusters?')) return;
-    await window.janusApi.cluster.clearAll();
+    await window.chaiApi.cluster.clearAll();
     await refreshClusters();
     window.alert('All clusters cleared.');
   }, [refreshClusters]);
@@ -680,11 +684,11 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
     if (!activeThread || activeThread.sourceType !== 'whatsapp_chat') return;
     const text = waInput.trim();
     if (!text) return;
-    if (!window.janusApi) return;
+    if (!window.chaiApi) return;
     setIsWaSending(true);
     setWaSendingStatus({ text: 'Sending...', isError: false });
     try {
-      await window.janusApi.whatsapp.sendText({
+      await window.chaiApi.whatsapp.sendText({
         jid: activeThread.id,
         text,
         clientRequestId: buildClientRequestId('wa'),
@@ -706,12 +710,12 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
   const sendEmailMessage = useCallback(async () => {
     const textBody = emailBody.trim();
     if (!textBody) return;
-    if (!window.janusApi) return;
+    if (!window.chaiApi) return;
     const isReplyMode = !emailNewMode;
     setIsEmailSending(true);
     setEmailSendingStatus({ text: 'Sending...', isError: false });
     try {
-      await window.janusApi.gmail.sendEmail({
+      await window.chaiApi.gmail.sendEmail({
         clientRequestId: buildClientRequestId('email'),
         threadId:
           isReplyMode && activeThread?.sourceType === 'email_thread'
@@ -758,10 +762,10 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
   }, []);
 
   const confirmConnectGmail = useCallback(async () => {
-    if (!window.janusApi) return;
+    if (!window.chaiApi) return;
     setGmailConnecting(true);
     try {
-      await window.janusApi.connectConnector('gmail');
+      await window.chaiApi.connectConnector('gmail');
       setGmailPreflightOpen(false);
       setConnectOverlay('gmail');
     } catch (error) {
@@ -776,8 +780,8 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
   }, []);
 
   const onDisconnectGmail = useCallback(async () => {
-    if (!window.janusApi) return;
-    await window.janusApi.disconnectConnector('gmail');
+    if (!window.chaiApi) return;
+    await window.chaiApi.disconnectConnector('gmail');
     setEmailThreads([]);
     if (activeThread?.sourceType === 'email_thread') {
       setActiveThread(null);
@@ -787,15 +791,15 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
   }, [activeThread]);
 
   const onSyncGmail = useCallback(async () => {
-    if (!window.janusApi) return;
-    await window.janusApi.syncConnector('gmail');
+    if (!window.chaiApi) return;
+    await window.chaiApi.syncConnector('gmail');
     await loadEmailThreads();
   }, [loadEmailThreads]);
 
   const onConnectWhatsapp = useCallback(async () => {
-    if (!window.janusApi) return;
+    if (!window.chaiApi) return;
     try {
-      await window.janusApi.connectConnector('whatsapp');
+      await window.chaiApi.connectConnector('whatsapp');
     } catch (error) {
       setWaSendingStatus({
         text: `Connect failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -805,8 +809,8 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
   }, []);
 
   const onDisconnectWhatsapp = useCallback(async () => {
-    if (!window.janusApi) return;
-    await window.janusApi.disconnectConnector('whatsapp');
+    if (!window.chaiApi) return;
+    await window.chaiApi.disconnectConnector('whatsapp');
     setWhatsappChats([]);
     if (activeThread?.sourceType === 'whatsapp_chat') {
       setActiveThread(null);
@@ -1050,8 +1054,8 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
                 className="attachment-pill"
                 onClick={async (event) => {
                   event.stopPropagation();
-                  if (!window.janusApi) return;
-                  await window.janusApi.gmail.downloadAttachment(attachment.id);
+                  if (!window.chaiApi) return;
+                  await window.chaiApi.gmail.downloadAttachment(attachment.id);
                 }}
               >
                 📎 {attachment.filename || 'attachment'}
@@ -1117,7 +1121,7 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
         {!snapshot.settings.privacyBannerDismissed ? (
           <PrivacyBanner
             onDismiss={() => {
-              void window.janusApi?.updateSettings({
+              void window.chaiApi?.updateSettings({
                 privacyBannerDismissed: true,
               });
             }}
@@ -1127,7 +1131,7 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
           <FreemiumBanner
             onUpgradeClick={() => setFreemiumModalOpen(true)}
             onDismiss={() => {
-              void window.janusApi?.updateSettings({
+              void window.chaiApi?.updateSettings({
                 freemiumBannerDismissed: true,
               });
             }}
@@ -1280,6 +1284,19 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
           </div>
         ) : null}
 
+        {activeTab === 'whatsapp' ? (
+          <div className="chat-search">
+            <input
+              type="search"
+              className="chat-search-input"
+              placeholder="Search recent chats"
+              aria-label="Search recent WhatsApp chats"
+              value={waSearch}
+              onChange={(event) => setWaSearch(event.target.value)}
+            />
+          </div>
+        ) : null}
+
         {activeTab !== 'clusters' ? (
           <div className="chat-filter-chips" role="tablist" aria-label="Filter">
             {(['all', 'unread', 'favorites', 'groups'] as const).map(
@@ -1347,14 +1364,40 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
             )
           ) : (
             (() => {
-              const visible =
-                chatFilter === 'unread'
-                  ? items.filter((item) => (item.unreadCount ?? 0) > 0)
-                  : items;
-              if (visible.length === 0 && chatFilter === 'unread') {
-                return (
-                  <div className="chat-empty-state">No unread chats.</div>
+              const searchQuery =
+                activeTab === 'whatsapp' ? waSearch.trim().toLowerCase() : '';
+              let visible = items;
+              if (searchQuery) {
+                const scope = [...items]
+                  .sort((a, b) => (b.time ?? 0) - (a.time ?? 0))
+                  .slice(0, 100);
+                visible = scope.filter((item) => {
+                  const title = (item.title ?? '').toLowerCase();
+                  const preview = (item.preview ?? '').toLowerCase();
+                  return (
+                    title.includes(searchQuery) ||
+                    preview.includes(searchQuery)
+                  );
+                });
+              }
+              if (chatFilter === 'unread') {
+                visible = visible.filter(
+                  (item) => (item.unreadCount ?? 0) > 0,
                 );
+              }
+              if (visible.length === 0) {
+                if (searchQuery) {
+                  return (
+                    <div className="chat-empty-state">
+                      No matches in the last 100 chats.
+                    </div>
+                  );
+                }
+                if (chatFilter === 'unread') {
+                  return (
+                    <div className="chat-empty-state">No unread chats.</div>
+                  );
+                }
               }
               return visible.map((item, idx) =>
                 renderItemRow(item, visible, idx),
@@ -1757,7 +1800,7 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
         <TutorialModal
           defaultWorkStartTime={snapshot.settings.workStartTime ?? null}
           onComplete={async ({ workStartTime }) => {
-            await window.janusApi?.updateSettings({
+            await window.chaiApi?.updateSettings({
               onboardingCompleted: true,
               tutorialCompleted: true,
               workStartTime,

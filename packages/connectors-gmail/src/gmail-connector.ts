@@ -1,8 +1,8 @@
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { Logger, JanusConnector } from '@janus/core';
-import type { EmailStore } from '@janus/db';
+import type { Logger, ChaiConnector } from '@chai/core';
+import type { EmailStore } from '@chai/db';
 import {
   authedFetch,
   assertOauthConfig,
@@ -60,7 +60,7 @@ export type GmailSyncSummary = {
   messages: number;
 };
 
-export type GmailConnector = JanusConnector & {
+export type GmailConnector = ChaiConnector & {
   readonly tokenPath: string;
   getStatus(): GmailRuntimeStatus;
   getAttachmentContent(
@@ -353,7 +353,7 @@ export const createGmailConnector = (
     }
   };
 
-  const bootstrap: JanusConnector['bootstrap'] = async () => {
+  const bootstrap: ChaiConnector['bootstrap'] = async () => {
     const profile = getStoredProfile();
     const token = getStoredToken();
     const account = options.emailStore.getEmailAccount('local-user', 'gmail');
@@ -375,7 +375,7 @@ export const createGmailConnector = (
     return { connected: false };
   };
 
-  const connect: JanusConnector['connect'] = async () => {
+  const connect: ChaiConnector['connect'] = async () => {
     const config = parseOauthConfig();
     const token = await runDesktopOAuth({
       config,
@@ -417,7 +417,7 @@ export const createGmailConnector = (
     return { metadata: { emailAddress } };
   };
 
-  const disconnect: JanusConnector['disconnect'] = async () => {
+  const disconnect: ChaiConnector['disconnect'] = async () => {
     if (existsSync(tokenPath)) rmSync(tokenPath, { force: true });
     if (existsSync(profilePath)) rmSync(profilePath, { force: true });
 
@@ -436,7 +436,7 @@ export const createGmailConnector = (
     };
   };
 
-  const syncWrapped: JanusConnector['sync'] = async () => {
+  const syncWrapped: ChaiConnector['sync'] = async () => {
     const summary = await sync();
     return {
       lastSyncedAt: nowIso(),

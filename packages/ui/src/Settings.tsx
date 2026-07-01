@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 type Snapshot = Awaited<
-  ReturnType<NonNullable<typeof window.janusApi>['getRuntimeState']>
+  ReturnType<NonNullable<typeof window.chaiApi>['getRuntimeState']>
 >;
 
 type Props = {
@@ -34,9 +34,9 @@ export const SettingsModal = ({ snapshot, onClose }: Props) => {
   }, [snapshot.settings.llmModelPath]);
 
   const cycleTheme = async () => {
-    if (!window.janusApi) return;
+    if (!window.chaiApi) return;
     try {
-      await window.janusApi.updateSettings({
+      await window.chaiApi.updateSettings({
         theme: themeNext(snapshot.settings.theme),
       });
     } catch (err) {
@@ -45,12 +45,12 @@ export const SettingsModal = ({ snapshot, onClose }: Props) => {
   };
 
   const exportDiagnostics = async () => {
-    if (!window.janusApi) return;
+    if (!window.chaiApi) return;
     setDiagnosticsBusy(true);
     setDiagnosticsResult(null);
     setError(null);
     try {
-      const result = await window.janusApi.diagnostics.export();
+      const result = await window.chaiApi.diagnostics.export();
       if (result.saved) {
         setDiagnosticsResult(`Saved to ${result.savedPath}`);
       } else {
@@ -64,12 +64,12 @@ export const SettingsModal = ({ snapshot, onClose }: Props) => {
   };
 
   const checkForUpdates = async () => {
-    if (!window.janusApi) return;
+    if (!window.chaiApi) return;
     setUpdateBusy(true);
     setUpdateResult(null);
     setError(null);
     try {
-      const result = await window.janusApi.update.check();
+      const result = await window.chaiApi.update.check();
       if (result.kind === 'unconfigured') {
         setUpdateResult(result.message);
       } else if (result.kind === 'error') {
@@ -95,11 +95,11 @@ export const SettingsModal = ({ snapshot, onClose }: Props) => {
   };
 
   const saveLocalAi = async () => {
-    if (!window.janusApi) return;
+    if (!window.chaiApi) return;
     setSaving(true);
     setError(null);
     try {
-      await window.janusApi.updateSettings({
+      await window.chaiApi.updateSettings({
         llmModelPath: llmModelPath.trim() || null,
       });
       setSavedAt(new Date().toLocaleTimeString());
@@ -111,10 +111,10 @@ export const SettingsModal = ({ snapshot, onClose }: Props) => {
   };
 
   const chooseModelFile = async () => {
-    if (!window.janusApi) return;
+    if (!window.chaiApi) return;
     setError(null);
     try {
-      const result = await window.janusApi.ai.chooseModelFile();
+      const result = await window.chaiApi.ai.chooseModelFile();
       if (result.canceled) return;
       setLlmModelPath(result.path);
     } catch (err) {
@@ -251,7 +251,7 @@ export const SettingsModal = ({ snapshot, onClose }: Props) => {
             <h4>Updates</h4>
             <p className="settings-hint">
               Checks the GitHub Releases update feed (override with{' '}
-              <code>JANUS_UPDATE_FEED_URL</code>). Beta channel only for
+              <code>CHAI_UPDATE_FEED_URL</code>). Beta channel only for
               now. Required updates block usage if the local version is below
               the minimum supported version.
             </p>

@@ -3,6 +3,7 @@ import type {
   WaChatRecord,
   WaContactRecord,
   WaMessageRecord,
+  WaMessageWithReply,
   WaOutboxMessageRecord,
   WaOutboxStatus,
 } from './types.js';
@@ -40,6 +41,8 @@ const mapMessageRow = (row: any): WaMessageRecord => ({
   mediaPath: row.media_path,
   mediaThumbDataUri: row.media_thumb_data_uri,
   rawContent: row.raw_content,
+  replyToStanzaId: row.reply_to_stanza_id ?? null,
+  replyToParticipant: row.reply_to_participant ?? null,
 });
 
 const mapChatRow = (row: any): WaChatRecord => ({
@@ -121,12 +124,14 @@ export const createWhatsAppStore = (db: Database) => {
     INSERT INTO wa_messages (
       message_key, remote_jid, key_id, from_me, participant, sender_jid, message_timestamp,
       message_type, text, status, is_deleted, media_type, media_mime, media_path,
-      media_thumb_data_uri, raw_content, created_at, updated_at
+      media_thumb_data_uri, raw_content, reply_to_stanza_id, reply_to_participant,
+      created_at, updated_at
     )
     VALUES (
       @messageKey, @remoteJid, @keyId, @fromMe, @participant, @senderJid, @messageTimestamp,
       @messageType, @text, @status, @isDeleted, @mediaType, @mediaMime, @mediaPath,
-      @mediaThumbDataUri, @rawContent, @createdAt, @updatedAt
+      @mediaThumbDataUri, @rawContent, @replyToStanzaId, @replyToParticipant,
+      @createdAt, @updatedAt
     )
     ON CONFLICT(message_key) DO UPDATE SET
       message_timestamp = MAX(wa_messages.message_timestamp, excluded.message_timestamp),
@@ -142,6 +147,8 @@ export const createWhatsAppStore = (db: Database) => {
       media_path = COALESCE(excluded.media_path, wa_messages.media_path),
       media_thumb_data_uri = COALESCE(excluded.media_thumb_data_uri, wa_messages.media_thumb_data_uri),
       raw_content = COALESCE(excluded.raw_content, wa_messages.raw_content),
+      reply_to_stanza_id = COALESCE(excluded.reply_to_stanza_id, wa_messages.reply_to_stanza_id),
+      reply_to_participant = COALESCE(excluded.reply_to_participant, wa_messages.reply_to_participant),
       sender_jid = COALESCE(excluded.sender_jid, wa_messages.sender_jid),
       updated_at = excluded.updated_at
   `);
@@ -217,6 +224,8 @@ export const createWhatsAppStore = (db: Database) => {
       mediaPath: input.mediaPath,
       mediaThumbDataUri: input.mediaThumbDataUri,
       rawContent: input.rawContent,
+      replyToStanzaId: input.replyToStanzaId,
+      replyToParticipant: input.replyToParticipant,
       createdAt: now,
       updatedAt: now,
     });
@@ -325,6 +334,35 @@ export const createWhatsAppStore = (db: Database) => {
       )
       .all(jid, limit) as any[];
     return rows.map(mapMessageRow);
+  };
+
+  const getMessagesForChatWithReplies = (
+    jid: string,
+    limit = 200,
+  ): WaMessageWithReply[] => {
+    const rows = db
+      .prepare(
+        `SELECT * FROM (
+          SELECT
+            m.*,
+            parent.text AS reply_to_text,
+            parent.sender_jid AS reply_to_sender_jid
+          FROM wa_messages m
+          LEFT JOIN wa_messages parent
+            ON parent.remote_jid = m.remote_jid
+           AND parent.key_id = m.reply_to_stanza_id
+          WHERE m.remote_jid = ?
+          ORDER BY m.message_timestamp DESC, m.created_at DESC
+          LIMIT ?
+        ) recent
+        ORDER BY message_timestamp ASC, created_at ASC`,
+      )
+      .all(jid, limit) as any[];
+    return rows.map((row) => ({
+      ...mapMessageRow(row),
+      replyToText: row.reply_to_text ?? null,
+      replyToSenderJid: row.reply_to_sender_jid ?? null,
+    }));
   };
 
   const getContact = (jid: string): WaContactRecord | null => {
@@ -449,6 +487,7 @@ export const createWhatsAppStore = (db: Database) => {
     getMessage,
     getChats,
     getMessagesForChat,
+    getMessagesForChatWithReplies,
     getContact,
     resolveDisplayName,
     createWaOutboxMessage,

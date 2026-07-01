@@ -1,12 +1,12 @@
 # Prototype Migration Map
 
-This file tracks source-material copied from `Baileys/demo` into `janus-layer-0`, plus where the production implementation now lives in package boundaries.
+This file tracks source-material copied from `Baileys/demo` into `chai`, plus where the production implementation now lives in package boundaries.
 
 ## Reference copies (read-only)
 
 These files were copied verbatim from the prototype and remain in the package source trees as historical references. They are excluded from `tsc` builds via per-package `exclude: ["src/prototype-*.ts"]`.
 
-| Prototype source | Reference copy in janus-layer-0 |
+| Prototype source | Reference copy in chai |
 |---|---|
 | `demo/db.ts` | `packages/db/src/prototype-db.ts` |
 | `demo/email.ts` | `packages/connectors-gmail/src/prototype-email.ts` |
@@ -48,13 +48,13 @@ These files were copied verbatim from the prototype and remain in the package so
 - Cluster persistence — `packages/db/migrations/005_clusters_and_ai.sql`, `packages/db/src/cluster-store.ts`
 - AI workflow extraction (Ollama) — `packages/ai/src/{ollama,workflow-prompt}.ts`
 - Compose / reply UX (Gmail + WhatsApp) — `packages/ui/src/Workspace.tsx`
-- Attachment download UX — IPC `janus:gmail:download-attachment` + Electron save dialog in `apps/desktop/electron/main.js`
+- Attachment download UX — IPC `chai:gmail:download-attachment` + Electron save dialog in `apps/desktop/electron/main.js`
 
 ## Phase 3 polish (current)
 
 - Settings + onboarding modal — `packages/ui/src/Settings.tsx`
 - Cluster rename / recolor / delete via right-click context menu — `packages/ui/src/Workspace.tsx`
-- JanusSettings extended with `ollamaBaseUrl` / `ollamaModel` overrides; main rebuilds the workflow extractor on settings change.
+- ChaiSettings extended with `ollamaBaseUrl` / `ollamaModel` overrides; main rebuilds the workflow extractor on settings change.
 
 ## Phase 4 (current)
 
@@ -62,7 +62,7 @@ These files were copied verbatim from the prototype and remain in the package so
 - Update checker (version compare + optional/required logic) — `packages/core/src/updater.ts`
 - `electron-updater` integration with download progress, quit-and-install, and event forwarding to the renderer — `apps/desktop/electron/main.js` (`configureAutoUpdater`, `runUpdateCheck`)
 - Required-update full-window screen + optional-update sidebar banner — `packages/ui/src/UpdateScreens.tsx`
-- electron-builder release config (mac dmg + zip, hardened runtime + entitlements; win nsis; linux AppImage); `pnpm release:desktop` toggles via `JANUS_RELEASE=1` — `apps/desktop/package.json`, `apps/desktop/build/entitlements.mac.plist`, `apps/desktop/electron/package.js`
+- electron-builder release config (mac dmg + zip, hardened runtime + entitlements; win nsis; linux AppImage); `pnpm release:desktop` toggles via `CHAI_RELEASE=1` — `apps/desktop/package.json`, `apps/desktop/build/entitlements.mac.plist`, `apps/desktop/electron/package.js`
 - Migration test harness — `scripts/test-migrations.js`, `scripts/fixtures/migrations-v1/`
 - Release + update guide — `docs/RELEASE.md`
 - Friends/family QA plan — `docs/QA_PLAN.md`

@@ -1,114 +1,114 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('janusMeta', {
+contextBridge.exposeInMainWorld('chaiMeta', {
   platform: process.platform,
   versions: process.versions,
 });
 
-contextBridge.exposeInMainWorld('janusApi', {
-  getRuntimeState: () => ipcRenderer.invoke('janus:get-runtime-state'),
+contextBridge.exposeInMainWorld('chaiApi', {
+  getRuntimeState: () => ipcRenderer.invoke('chai:get-runtime-state'),
   updateSettings: (patch) =>
-    ipcRenderer.invoke('janus:update-settings', patch),
+    ipcRenderer.invoke('chai:update-settings', patch),
   connectConnector: (connector) =>
-    ipcRenderer.invoke('janus:connector:connect', connector),
+    ipcRenderer.invoke('chai:connector:connect', connector),
   disconnectConnector: (connector) =>
-    ipcRenderer.invoke('janus:connector:disconnect', connector),
+    ipcRenderer.invoke('chai:connector:disconnect', connector),
   syncConnector: (connector) =>
-    ipcRenderer.invoke('janus:connector:sync', connector),
+    ipcRenderer.invoke('chai:connector:sync', connector),
 
   gmail: {
-    listThreads: () => ipcRenderer.invoke('janus:gmail:list-threads'),
+    listThreads: () => ipcRenderer.invoke('chai:gmail:list-threads'),
     getThread: (threadId) =>
-      ipcRenderer.invoke('janus:gmail:get-thread', threadId),
-    sendEmail: (payload) => ipcRenderer.invoke('janus:gmail:send', payload),
+      ipcRenderer.invoke('chai:gmail:get-thread', threadId),
+    sendEmail: (payload) => ipcRenderer.invoke('chai:gmail:send', payload),
     downloadAttachment: (attachmentId) =>
-      ipcRenderer.invoke('janus:gmail:download-attachment', attachmentId),
+      ipcRenderer.invoke('chai:gmail:download-attachment', attachmentId),
     openAttachment: (attachmentId) =>
-      ipcRenderer.invoke('janus:gmail:open-attachment', attachmentId),
+      ipcRenderer.invoke('chai:gmail:open-attachment', attachmentId),
   },
 
   whatsapp: {
-    listChats: () => ipcRenderer.invoke('janus:whatsapp:list-chats'),
-    getChat: (jid) => ipcRenderer.invoke('janus:whatsapp:get-chat', jid),
+    listChats: () => ipcRenderer.invoke('chai:whatsapp:list-chats'),
+    getChat: (jid) => ipcRenderer.invoke('chai:whatsapp:get-chat', jid),
     sendText: (payload) =>
-      ipcRenderer.invoke('janus:whatsapp:send', payload),
-    getStatus: () => ipcRenderer.invoke('janus:whatsapp:status'),
+      ipcRenderer.invoke('chai:whatsapp:send', payload),
+    getStatus: () => ipcRenderer.invoke('chai:whatsapp:status'),
   },
 
   cluster: {
-    list: () => ipcRenderer.invoke('janus:cluster:list'),
-    create: (input) => ipcRenderer.invoke('janus:cluster:create', input),
-    rename: (input) => ipcRenderer.invoke('janus:cluster:rename', input),
-    remove: (id) => ipcRenderer.invoke('janus:cluster:delete', id),
+    list: () => ipcRenderer.invoke('chai:cluster:list'),
+    create: (input) => ipcRenderer.invoke('chai:cluster:create', input),
+    rename: (input) => ipcRenderer.invoke('chai:cluster:rename', input),
+    remove: (id) => ipcRenderer.invoke('chai:cluster:delete', id),
     addMembers: (input) =>
-      ipcRenderer.invoke('janus:cluster:add-members', input),
+      ipcRenderer.invoke('chai:cluster:add-members', input),
     removeMember: (input) =>
-      ipcRenderer.invoke('janus:cluster:remove-member', input),
+      ipcRenderer.invoke('chai:cluster:remove-member', input),
     listMembers: (clusterId) =>
-      ipcRenderer.invoke('janus:cluster:list-members', clusterId),
-    clearAll: () => ipcRenderer.invoke('janus:cluster:clear-all'),
+      ipcRenderer.invoke('chai:cluster:list-members', clusterId),
+    clearAll: () => ipcRenderer.invoke('chai:cluster:clear-all'),
   },
 
   ai: {
     extractWorkflow: (text) =>
-      ipcRenderer.invoke('janus:ai:extract-workflow', text),
-    chooseModelFile: () => ipcRenderer.invoke('janus:ai:choose-model-file'),
-    saveOutput: (input) => ipcRenderer.invoke('janus:ai:save-output', input),
+      ipcRenderer.invoke('chai:ai:extract-workflow', text),
+    chooseModelFile: () => ipcRenderer.invoke('chai:ai:choose-model-file'),
+    saveOutput: (input) => ipcRenderer.invoke('chai:ai:save-output', input),
     listOutputs: (clusterId) =>
-      ipcRenderer.invoke('janus:ai:list-outputs', clusterId),
+      ipcRenderer.invoke('chai:ai:list-outputs', clusterId),
   },
 
   migration: {
-    retry: () => ipcRenderer.invoke('janus:migration:retry'),
+    retry: () => ipcRenderer.invoke('chai:migration:retry'),
   },
 
   diagnostics: {
-    export: () => ipcRenderer.invoke('janus:diagnostics:export'),
+    export: () => ipcRenderer.invoke('chai:diagnostics:export'),
   },
 
   update: {
-    check: (input) => ipcRenderer.invoke('janus:update:check', input),
-    download: () => ipcRenderer.invoke('janus:update:download'),
-    install: () => ipcRenderer.invoke('janus:update:install'),
-    lastInfo: () => ipcRenderer.invoke('janus:update:last'),
+    check: (input) => ipcRenderer.invoke('chai:update:check', input),
+    download: () => ipcRenderer.invoke('chai:update:download'),
+    install: () => ipcRenderer.invoke('chai:update:install'),
+    lastInfo: () => ipcRenderer.invoke('chai:update:last'),
   },
 
   events: {
     onRuntimeSnapshot: (handler) => {
       const listener = (_event, payload) => handler(payload);
-      ipcRenderer.on('janus:runtime-snapshot', listener);
+      ipcRenderer.on('chai:runtime-snapshot', listener);
       return () =>
-        ipcRenderer.removeListener('janus:runtime-snapshot', listener);
+        ipcRenderer.removeListener('chai:runtime-snapshot', listener);
     },
     onWhatsAppEvent: (handler) => {
       const listener = (_event, payload) => handler(payload);
-      ipcRenderer.on('janus:whatsapp:event', listener);
+      ipcRenderer.on('chai:whatsapp:event', listener);
       return () =>
-        ipcRenderer.removeListener('janus:whatsapp:event', listener);
+        ipcRenderer.removeListener('chai:whatsapp:event', listener);
     },
     onConnectorEvent: (handler) => {
       const listener = (_event, payload) => handler(payload);
-      ipcRenderer.on('janus:connector:event', listener);
+      ipcRenderer.on('chai:connector:event', listener);
       return () =>
-        ipcRenderer.removeListener('janus:connector:event', listener);
+        ipcRenderer.removeListener('chai:connector:event', listener);
     },
     onGmailEvent: (handler) => {
       const listener = (_event, payload) => handler(payload);
-      ipcRenderer.on('janus:gmail:event', listener);
+      ipcRenderer.on('chai:gmail:event', listener);
       return () =>
-        ipcRenderer.removeListener('janus:gmail:event', listener);
+        ipcRenderer.removeListener('chai:gmail:event', listener);
     },
     onUpdateEvent: (handler) => {
       const listener = (_event, payload) => handler(payload);
-      ipcRenderer.on('janus:update:event', listener);
+      ipcRenderer.on('chai:update:event', listener);
       return () =>
-        ipcRenderer.removeListener('janus:update:event', listener);
+        ipcRenderer.removeListener('chai:update:event', listener);
     },
     onModelDownload: (handler) => {
       const listener = (_event, payload) => handler(payload);
-      ipcRenderer.on('janus:ai:model-download', listener);
+      ipcRenderer.on('chai:ai:model-download', listener);
       return () =>
-        ipcRenderer.removeListener('janus:ai:model-download', listener);
+        ipcRenderer.removeListener('chai:ai:model-download', listener);
     },
   },
 });

@@ -39,6 +39,6 @@ export const loadEnvFileIfPresent = (envPath) => {
   }
 };
 
-export const loadJanusEnv = (repoRoot) => {
+export const loadChaiEnv = (repoRoot) => {
   loadEnvFileIfPresent(path.join(repoRoot, '.env'));
 };

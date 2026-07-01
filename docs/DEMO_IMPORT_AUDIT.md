@@ -1,4 +1,4 @@
-# Demo Import Audit (`Baileys/demo` -> `janus-layer-0`)
+# Demo Import Audit (`Baileys/demo` -> `chai`)
 
 Status: active
 Last updated: 2026-05-02
@@ -7,7 +7,7 @@ Source audited: `/Users/anujshah/Desktop/Projects/Baileys/demo`
 
 ## Objective
 
-Import useful prototype logic into `janus-layer-0` while preserving product constraints:
+Import useful prototype logic into `chai` while preserving product constraints:
 - desktop-first
 - local-first
 - privacy-first
@@ -70,7 +70,7 @@ Imported now:
 - typed `GmailSendService` with outbox dedupe by `clientRequestId`
 - thread-aware reply (resolves `In-Reply-To` / `References` from Gmail metadata API)
 - structured outbox status updates (`queued`, `sending`, `sent`, `failed`) via `EmailStore`
-- IPC at `janus:gmail:send`
+- IPC at `chai:gmail:send`
 
 Lives in:
 - `packages/connectors-gmail/src/gmail-send-service.ts`
@@ -94,7 +94,7 @@ Imported now:
 - reconnect with exponential backoff, logout detection
 - history.set / chats.upsert / contacts.upsert / messages.upsert / messages.update / messages.delete handlers mirror into `WhatsAppStore`
 - `createWhatsAppSendService` ports the prototype outbox + `sock.sendMessage` flow
-- IPC at `janus:whatsapp:send`
+- IPC at `chai:whatsapp:send`
 
 Lives in:
 - `packages/connectors-whatsapp/src/{whatsapp-connector,whatsapp-send-service,message-parser}.ts`
@@ -122,10 +122,10 @@ Decision:
 - **Imported with refactor — complete.**
 
 Imported now:
-- TypeScript `createWorkflowExtractor` in `@janus/ai/src/ollama.ts`
+- TypeScript `createWorkflowExtractor` in `@chai/ai/src/ollama.ts`
 - Workflow prompt and `WORKFLOW_CATEGORIES` constants ported verbatim
 - Renderer AI panel: cluster picker + lookback hours pickers + run-for-cluster + run-for-all-clusters + progress bar + collated output rendering
-- AI outputs persisted to `ai_outputs` table via IPC `janus:ai:save-output`
+- AI outputs persisted to `ai_outputs` table via IPC `chai:ai:save-output`
 
 Lives in:
 - `packages/ai/src/{ollama,workflow-prompt}.ts`
@@ -153,7 +153,7 @@ Imported now:
 
 What changed vs the demo:
 - Cluster state moved from `localStorage` to the DB (`clusters` + `cluster_members`)
-- HTTP/WebSocket calls replaced with `window.janusApi.*` Electron IPC
+- HTTP/WebSocket calls replaced with `window.chaiApi.*` Electron IPC
 - Email attachment links replaced with an Electron save-dialog flow
 
 ## Next extraction batches

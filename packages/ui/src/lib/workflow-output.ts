@@ -1,16 +1,19 @@
-export const WORKFLOW_CATEGORIES = [
-  'TODO ITEMS',
-  'DEADLINES',
-  'REMINDERS',
-  'ASSIGNMENTS',
-  'PROGRESS UPDATES',
-] as const;
+import {
+  APPROX_CHARS_PER_TOKEN,
+  MAX_CLUSTER_TEXT_CHARS,
+  MAX_CLUSTER_TOKENS,
+  WORKFLOW_CATEGORIES,
+  type WorkflowCategory,
+} from '@chai/ai-prompts';
 
-export type WorkflowCategory = (typeof WORKFLOW_CATEGORIES)[number];
+export {
+  APPROX_CHARS_PER_TOKEN,
+  MAX_CLUSTER_TEXT_CHARS,
+  MAX_CLUSTER_TOKENS,
+  WORKFLOW_CATEGORIES,
+  type WorkflowCategory,
+};
 
-export const APPROX_CHARS_PER_TOKEN = 4;
-export const MAX_CLUSTER_TOKENS = 10000;
-export const MAX_CLUSTER_TEXT_CHARS = MAX_CLUSTER_TOKENS * APPROX_CHARS_PER_TOKEN;
 export const LOOKBACK_HOURS_OPTIONS = [2, 4, 8, 12] as const;
 
 export const parseWorkflowOutputByCategory = (

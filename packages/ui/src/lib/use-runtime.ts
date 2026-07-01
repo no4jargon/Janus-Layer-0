@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react';
 
 type Snapshot = Awaited<
-  ReturnType<NonNullable<typeof window.janusApi>['getRuntimeState']>
+  ReturnType<NonNullable<typeof window.chaiApi>['getRuntimeState']>
 >;
 
 type WaEvent = Parameters<
-  NonNullable<typeof window.janusApi>['events']['onWhatsAppEvent']
+  NonNullable<typeof window.chaiApi>['events']['onWhatsAppEvent']
 >[0] extends (event: infer T) => void
   ? T
   : never;
 
 type ConnectorEvent = Parameters<
-  NonNullable<typeof window.janusApi>['events']['onConnectorEvent']
+  NonNullable<typeof window.chaiApi>['events']['onConnectorEvent']
 >[0] extends (event: infer T) => void
   ? T
   : never;
@@ -20,10 +20,10 @@ export const useRuntimeSnapshot = () => {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
 
   useEffect(() => {
-    if (!window.janusApi) return;
+    if (!window.chaiApi) return;
     let mounted = true;
 
-    window.janusApi
+    window.chaiApi
       .getRuntimeState()
       .then((value) => {
         if (mounted) setSnapshot(value);
@@ -32,7 +32,7 @@ export const useRuntimeSnapshot = () => {
         /* surface via UI elsewhere */
       });
 
-    const unsubscribe = window.janusApi.events.onRuntimeSnapshot((next) => {
+    const unsubscribe = window.chaiApi.events.onRuntimeSnapshot((next) => {
       if (mounted) setSnapshot(next);
     });
 
@@ -47,8 +47,8 @@ export const useRuntimeSnapshot = () => {
 
 export const useWhatsAppEvents = (handler: (event: WaEvent) => void) => {
   useEffect(() => {
-    if (!window.janusApi) return;
-    const unsubscribe = window.janusApi.events.onWhatsAppEvent(handler);
+    if (!window.chaiApi) return;
+    const unsubscribe = window.chaiApi.events.onWhatsAppEvent(handler);
     return unsubscribe;
   }, [handler]);
 };
@@ -57,8 +57,8 @@ export const useConnectorEvents = (
   handler: (event: ConnectorEvent) => void,
 ) => {
   useEffect(() => {
-    if (!window.janusApi) return;
-    const unsubscribe = window.janusApi.events.onConnectorEvent(handler);
+    if (!window.chaiApi) return;
+    const unsubscribe = window.chaiApi.events.onConnectorEvent(handler);
     return unsubscribe;
   }, [handler]);
 };

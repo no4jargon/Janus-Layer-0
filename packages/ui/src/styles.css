@@ -362,6 +362,31 @@ body {
 	text-align: center;
 }
 
+.chat-search {
+	padding: 8px 10px 0;
+	background: #fff;
+}
+
+.chat-search-input {
+	width: 100%;
+	padding: 7px 12px;
+	border-radius: 999px;
+	border: 1px solid #e9edef;
+	background: #f0f2f5;
+	color: #111b21;
+	font-size: 13px;
+	outline: none;
+}
+
+.chat-search-input::placeholder {
+	color: #8696a0;
+}
+
+.chat-search-input:focus {
+	border-color: #25d366;
+	background: #fff;
+}
+
 .chat-filter-chips {
 	display: flex;
 	gap: 6px;
@@ -1190,7 +1215,7 @@ body {
 	}
 }
 
-/* migration recovery screen (added for janus-layer-0) */
+/* migration recovery screen (added for chai) */
 .migration-failure-shell {
 	max-width: 640px;
 	margin: 60px auto;

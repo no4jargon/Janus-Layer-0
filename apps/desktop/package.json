@@ -1,6 +1,6 @@
 {
   "name": "chai",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "private": true,
   "type": "module",
   "main": "electron/main.js",
@@ -8,17 +8,17 @@
     "dev": "node ./electron/dev.js",
     "build": "node ./electron/build.js",
     "package": "node ./electron/package.js",
-    "release": "cross-env JANUS_RELEASE=1 node ./electron/package.js",
+    "release": "cross-env CHAI_RELEASE=1 node ./electron/package.js",
     "verify:data-paths": "node ./electron/verify-data-paths.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@janus/ai": "workspace:*",
-    "@janus/connectors-gmail": "workspace:*",
-    "@janus/connectors-whatsapp": "workspace:*",
-    "@janus/core": "workspace:*",
-    "@janus/db": "workspace:*",
-    "@janus/shared": "workspace:*",
+    "@chai/ai": "workspace:*",
+    "@chai/connectors-gmail": "workspace:*",
+    "@chai/connectors-whatsapp": "workspace:*",
+    "@chai/core": "workspace:*",
+    "@chai/db": "workspace:*",
+    "@chai/shared": "workspace:*",
     "@node-llama-cpp/linux-arm64": "3.18.1",
     "@node-llama-cpp/linux-armv7l": "3.18.1",
     "@node-llama-cpp/linux-x64": "3.18.1",
@@ -41,7 +41,7 @@
     "vite": "^8.0.10"
   },
   "build": {
-    "appId": "com.janus.layer0",
+    "appId": "com.chai.app",
     "productName": "Chai",
     "files": [
       "electron/**/*",

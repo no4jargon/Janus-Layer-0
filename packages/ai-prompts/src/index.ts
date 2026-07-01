@@ -1,24 +1,20 @@
 export {
+  WORKFLOW_CATEGORIES,
+  WORKFLOW_PROMPT,
+  type WorkflowCategory,
+} from './workflow-prompt.js';
+export {
   APPROX_CHARS_PER_TOKEN,
   buildClusterPrompt,
   MAX_CLUSTER_TEXT_CHARS,
   MAX_CLUSTER_TOKENS,
-  WORKFLOW_CATEGORIES,
-  WORKFLOW_PROMPT,
   type BuildClusterPromptInput,
   type BuildClusterPromptResult,
   type CollatedMessage,
   type CollatedMessageSource,
+} from './build-prompt.js';
+export {
   type InferenceProvider,
   type InferenceProviderOptions,
   type InferenceResult,
-  type WorkflowCategory,
-} from '@chai/ai-prompts';
-export {
-  createWorkflowExtractor,
-  DEFAULT_MODEL_LABEL,
-  DEFAULT_MODEL_URI,
-  LocalLlamaCppProvider,
-  type WorkflowExtractor,
-  type WorkflowExtractorOptions,
-} from './llama-cpp.js';
+} from './inference.js';

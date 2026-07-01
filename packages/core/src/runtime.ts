@@ -3,13 +3,13 @@ import {
   createConnectorStateStore,
   type Database,
   type MigrationFailure,
-} from '@janus/db';
+} from '@chai/db';
 import {
   createConnectorRuntime,
   type ConnectorKind,
   type ConnectorRuntime,
   type ConnectorSnapshot,
-  type JanusConnector,
+  type ChaiConnector,
 } from './connector-runtime.js';
 import {
   ensureAppDataPaths,
@@ -21,7 +21,7 @@ import { createFileLogger, type Logger } from './logger.js';
 import {
   createSettingsStore,
   type SettingsStore,
-  type JanusSettings,
+  type ChaiSettings,
 } from './settings-store.js';
 
 export type CreateRuntimeInput = {
@@ -31,7 +31,7 @@ export type CreateRuntimeInput = {
   migrationsDir: string;
   appVersion: string;
   buildConnectors: (context: BuildConnectorsContext) => Partial<
-    Record<ConnectorKind, JanusConnector>
+    Record<ConnectorKind, ChaiConnector>
   >;
 };
 
@@ -50,7 +50,7 @@ export type RuntimeSnapshot = {
     dbPath: string;
     logsDir: string;
   };
-  settings: JanusSettings;
+  settings: ChaiSettings;
   previousLastOpenedAt: number | null;
   connectors: ConnectorSnapshot[];
   migrationFailure: SerializedMigrationFailure | null;
@@ -62,7 +62,7 @@ export type SerializedMigrationFailure = {
   backupPath: string | null;
 };
 
-export type JanusRuntime = {
+export type ChaiRuntime = {
   logger: Logger;
   paths: AppDataPaths;
   db: Database;
@@ -86,9 +86,9 @@ const serializeMigrationFailure = (
       }
     : null;
 
-export const createJanusRuntime = (
+export const createChaiRuntime = (
   input: CreateRuntimeInput,
-): JanusRuntime => {
+): ChaiRuntime => {
   const paths = resolveAppDataPaths({
     mode: input.mode,
     repoRoot: input.repoRoot,
@@ -127,7 +127,7 @@ export const createJanusRuntime = (
     });
   }
 
-  logger.info('janus runtime initialized', {
+  logger.info('chai runtime initialized', {
     mode: input.mode,
     appVersion: input.appVersion,
     dbPath: paths.dbPath,
@@ -164,7 +164,7 @@ export const createJanusRuntime = (
       } catch (error) {
         logger.warn('db close failed', { error: String(error) });
       }
-      logger.info('janus runtime closed');
+      logger.info('chai runtime closed');
     },
   };
 };

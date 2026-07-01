@@ -13,7 +13,7 @@ Runs `electron-builder --dir` with `mac.identity=null` and `publish=null`. Produ
 ## 2. Signed beta release
 
 ```bash
-JANUS_RELEASE=1 pnpm package:desktop
+CHAI_RELEASE=1 pnpm package:desktop
 # or
 pnpm --filter chai release
 ```
@@ -69,7 +69,7 @@ export GH_TOKEN=$(gh auth token)
 # Optional: force users on older versions to update before they can keep using the app
 export MIN_SUPPORTED_VERSION=0.2.0
 
-JANUS_RELEASE=1 JANUS_PUBLISH=1 pnpm --filter chai release
+CHAI_RELEASE=1 CHAI_PUBLISH=1 pnpm --filter chai release
 ```
 
 Under the hood:
@@ -83,7 +83,7 @@ Stable URLs once the release is published:
 - Installers + electron-updater feed: `https://github.com/no4jargon/Janus-Layer-0/releases/latest`
 - Forced-update feed: `https://github.com/no4jargon/Janus-Layer-0/releases/latest/download/latest.json`
 
-The forced-update feed URL is hard-coded as the default in `apps/desktop/electron/main.js` (`DEFAULT_UPDATE_FEED_URL`). Override at runtime with `JANUS_UPDATE_FEED_URL` for staging.
+The forced-update feed URL is hard-coded as the default in `apps/desktop/electron/main.js` (`DEFAULT_UPDATE_FEED_URL`). Override at runtime with `CHAI_UPDATE_FEED_URL` for staging.
 
 ## 4. Required (forced) update enforcement
 
@@ -98,7 +98,7 @@ The `latest.json` feed exists in addition to electron-updater's `latest-*.yml` b
 To ship a release that should NOT block existing users, set `MIN_SUPPORTED_VERSION` to a version older than (or equal to) the oldest installed build you still support:
 
 ```bash
-MIN_SUPPORTED_VERSION=0.1.0 JANUS_RELEASE=1 JANUS_PUBLISH=1 \
+MIN_SUPPORTED_VERSION=0.1.0 CHAI_RELEASE=1 CHAI_PUBLISH=1 \
   pnpm --filter chai release
 ```
 
@@ -117,7 +117,7 @@ The desktop app is currently distributed unsigned, so in-app auto-update is not 
 5. User downloads the appropriate `.dmg` / `.exe` / `.AppImage`, installs over the existing app, and relaunches.
 6. New version passes the `currentVersion >= minSupportedVersion` check and the workspace loads normally.
 
-If/when the app is signed (see section 2), the in-app `electron-updater` flow can be re-enabled — the IPC handlers (`janus:update:download` / `janus:update:install`) and the autoUpdater wiring in `apps/desktop/electron/main.js` are intact and ready to be re-bound to UI buttons.
+If/when the app is signed (see section 2), the in-app `electron-updater` flow can be re-enabled — the IPC handlers (`chai:update:download` / `chai:update:install`) and the autoUpdater wiring in `apps/desktop/electron/main.js` are intact and ready to be re-bound to UI buttons.
 
 ## 5. Optional update banner
 
@@ -128,5 +128,5 @@ When `decideUpdate` returns `kind: 'optional'`, a banner appears at the top of t
 The plan calls for `dev` / `beta` / `stable` channels. For now the beta channel is the only one wired:
 
 - `mac.publish.channel` and `createUpdateChecker`'s `channel` option default to `beta`.
-- Override at release time with `JANUS_RELEASE_CHANNEL` (used by `latest.json` generation).
+- Override at release time with `CHAI_RELEASE_CHANNEL` (used by `latest.json` generation).
 - Don't move to `stable` until the updater has been exercised against real installs and the migration test harness has run cleanly across the previous N releases.

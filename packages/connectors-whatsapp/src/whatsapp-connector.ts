@@ -18,8 +18,8 @@ import type {
   WAMessageUpdate,
   WASocket,
 } from 'baileys';
-import type { Logger as CoreLogger, JanusConnector } from '@janus/core';
-import type { WhatsAppStore } from '@janus/db';
+import type { Logger as CoreLogger, ChaiConnector } from '@chai/core';
+import type { BaileysSessionAdapter } from './baileys-session-adapter.js';
 import {
   buildMessageRow,
   isInterestingJid,
@@ -37,7 +37,12 @@ export type WhatsAppEvent =
 export type WhatsAppConnectorOptions = {
   keystoreDir: string;
   logger: CoreLogger;
-  store: WhatsAppStore;
+  /**
+   * Persistence sink for incoming Baileys events. The desktop wraps the
+   * local SQLite `WhatsAppStore` via `createDesktopBaileysSessionAdapter`;
+   * the worker (Phase 4+) supplies its own server-backed implementation.
+   */
+  adapter: BaileysSessionAdapter;
   onEvent?: (event: WhatsAppEvent) => void;
 };
 
@@ -50,7 +55,7 @@ export type WhatsAppRuntimeStatus = {
   loggedOut: boolean;
 };
 
-export type WhatsAppConnector = JanusConnector & {
+export type WhatsAppConnector = ChaiConnector & {
   getStatus(): WhatsAppRuntimeStatus;
   getActiveSocket(): WASocket | null;
 };
@@ -59,7 +64,7 @@ export const createWhatsAppConnector = (
   options: WhatsAppConnectorOptions,
 ): WhatsAppConnector => {
   const sessionDir = path.join(options.keystoreDir, 'whatsapp-session');
-  const { logger, store, onEvent } = options;
+  const { logger, adapter, onEvent } = options;
 
   const internalPino: PinoLogger = P({ level: 'warn' });
 
@@ -229,13 +234,13 @@ export const createWhatsAppConnector = (
           const lid = jidNormalizedUser(mapping.lid);
           const pn = jidNormalizedUser(mapping.pn);
           if (lid && pn) {
-            store.upsertJidMapping(lid, pn);
-            store.upsertJidMapping(pn, lid);
+            await adapter.upsertJidMapping(lid, pn);
+            await adapter.upsertJidMapping(pn, lid);
           }
         }
         for (const contact of contacts) {
           if ('id' in contact && contact.id) {
-            store.upsertContact({
+            await adapter.upsertContact({
               jid: contact.id as string,
               name: (contact as any).name ?? null,
               notify: (contact as any).notify ?? null,
@@ -248,7 +253,7 @@ export const createWhatsAppConnector = (
         }
         for (const chat of chats) {
           if (chat.id) {
-            store.upsertChat({
+            await adapter.upsertChat({
               jid: chat.id,
               name:
                 (chat as any).displayName ||
@@ -268,7 +273,7 @@ export const createWhatsAppConnector = (
         }
         for (const message of messages as WAMessage[]) {
           if (!isInterestingJid(message.key?.remoteJid)) continue;
-          store.upsertMessage(buildMessageRow(message));
+          await adapter.upsertMessage(buildMessageRow(message));
         }
         emit({
           type: 'history-loaded',
@@ -279,7 +284,7 @@ export const createWhatsAppConnector = (
       if (events['chats.upsert']) {
         for (const chat of events['chats.upsert']) {
           if (!chat.id) continue;
-          store.upsertChat({
+          await adapter.upsertChat({
             jid: chat.id,
             name:
               (chat as any).displayName ||
@@ -299,7 +304,7 @@ export const createWhatsAppConnector = (
       if (events['contacts.upsert']) {
         for (const contact of events['contacts.upsert']) {
           if (!contact.id) continue;
-          store.upsertContact({
+          await adapter.upsertContact({
             jid: contact.id,
             name: (contact as any).name ?? null,
             notify: (contact as any).notify ?? null,
@@ -315,8 +320,9 @@ export const createWhatsAppConnector = (
         const seen = new Set<string>();
         for (const message of events['messages.upsert'].messages as WAMessage[]) {
           if (!isInterestingJid(message.key?.remoteJid)) continue;
-          const persisted = store.upsertMessage(buildMessageRow(message));
-          if (persisted) seen.add(persisted.remoteJid);
+          const row = buildMessageRow(message);
+          await adapter.upsertMessage(row);
+          seen.add(row.remoteJid);
         }
         for (const remoteJid of seen) {
           emit({ type: 'message-upsert', payload: { remoteJid } });
@@ -326,7 +332,7 @@ export const createWhatsAppConnector = (
       if (events['messages.update']) {
         for (const update of events['messages.update'] as WAMessageUpdate[]) {
           const key = messageKeyFromWAKey(update.key);
-          const existing = store.getMessage(key);
+          const existing = await adapter.getMessage(key);
           if (!existing) continue;
           const text =
             update.update.message === null
@@ -334,7 +340,7 @@ export const createWhatsAppConnector = (
               : (update.update.message as any)?.conversation ||
                 (update.update.message as any)?.extendedTextMessage?.text ||
                 existing.text;
-          store.updateMessage(key, {
+          await adapter.updateMessage(key, {
             text,
             status: update.update.status ?? existing.status,
             isDeleted: update.update.message === null,
@@ -352,13 +358,13 @@ export const createWhatsAppConnector = (
           | { jid: string; all: true };
 
         if ('all' in data && data.all && data.jid) {
-          store.deleteAllMessagesForChat(data.jid);
+          await adapter.deleteAllMessagesForChat(data.jid);
           return;
         }
 
         for (const item of (data as { keys: any[] }).keys || []) {
           const messageKey = messageKeyFromWAKey(item);
-          store.markMessageDeleted(messageKey);
+          await adapter.markMessageDeleted(messageKey);
         }
       }
     });
@@ -368,7 +374,7 @@ export const createWhatsAppConnector = (
 
   const isConnected = () => activeSock !== null && pairedAt !== null && !loggedOut;
 
-  const bootstrap: JanusConnector['bootstrap'] = async () => {
+  const bootstrap: ChaiConnector['bootstrap'] = async () => {
     if (!existsSync(sessionDir)) {
       return { connected: false };
     }
@@ -386,7 +392,7 @@ export const createWhatsAppConnector = (
     }
   };
 
-  const connect: JanusConnector['connect'] = async () => {
+  const connect: ChaiConnector['connect'] = async () => {
     cancelReconnect();
     teardownSocket();
     pairedAt = null;
@@ -422,7 +428,7 @@ export const createWhatsAppConnector = (
     };
   };
 
-  const disconnect: JanusConnector['disconnect'] = async () => {
+  const disconnect: ChaiConnector['disconnect'] = async () => {
     cancelReconnect();
     if (activeSock) {
       try {
@@ -441,7 +447,7 @@ export const createWhatsAppConnector = (
     lastQr = null;
   };
 
-  const sync: JanusConnector['sync'] = async () => {
+  const sync: ChaiConnector['sync'] = async () => {
     if (!isConnected()) {
       throw new Error('WhatsApp not connected');
     }
