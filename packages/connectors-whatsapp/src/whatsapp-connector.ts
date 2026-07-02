@@ -26,6 +26,17 @@ import {
   messageKeyFromWAKey,
 } from './message-parser.js';
 
+type BaileysContactLike = Record<string, unknown> & {
+  id?: string;
+  lid?: string;
+  name?: string | null;
+  notify?: string | null;
+  verifiedName?: string | null;
+  username?: string | null;
+  phoneNumber?: string | null;
+  imgUrl?: string | null;
+};
+
 export type WhatsAppEvent =
   | { type: 'qr'; payload: { qr: string } }
   | { type: 'connection'; payload: { connection: string; statusCode?: number } }
@@ -91,6 +102,52 @@ export const createWhatsAppConnector = (
 
   const ensureSessionDir = () => {
     mkdirSync(sessionDir, { recursive: true });
+  };
+
+  const normalizeUserJid = (value: unknown): string | null => {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    try {
+      return jidNormalizedUser(trimmed) || trimmed;
+    } catch {
+      return trimmed;
+    }
+  };
+
+  const persistJidMapping = async (
+    lidValue: unknown,
+    pnValue: unknown,
+  ): Promise<void> => {
+    const lid = normalizeUserJid(lidValue);
+    const pn = normalizeUserJid(pnValue);
+    if (!lid || !pn) return;
+    await adapter.upsertJidMapping(lid, pn);
+    await adapter.upsertJidMapping(pn, lid);
+  };
+
+  const persistContact = async (
+    contact: BaileysContactLike,
+  ): Promise<void> => {
+    const jid = normalizeUserJid(contact.id);
+    if (!jid) return;
+
+    const lid =
+      normalizeUserJid(contact.lid) || (jid.endsWith('@lid') ? jid : null);
+    const phoneNumber =
+      normalizeUserJid(contact.phoneNumber) ||
+      (jid.endsWith('@s.whatsapp.net') ? jid : null);
+
+    await persistJidMapping(lid, phoneNumber);
+    await adapter.upsertContact({
+      jid,
+      name: contact.name ?? null,
+      notify: contact.notify ?? null,
+      verifiedName: contact.verifiedName ?? null,
+      username: contact.username ?? null,
+      phoneNumber,
+      imgUrl: contact.imgUrl ?? null,
+    });
   };
 
   const cancelReconnect = () => {
@@ -231,25 +288,10 @@ export const createWhatsAppConnector = (
         } = historyEvent;
 
         for (const mapping of lidPnMappings) {
-          const lid = jidNormalizedUser(mapping.lid);
-          const pn = jidNormalizedUser(mapping.pn);
-          if (lid && pn) {
-            await adapter.upsertJidMapping(lid, pn);
-            await adapter.upsertJidMapping(pn, lid);
-          }
+          await persistJidMapping(mapping.lid, mapping.pn);
         }
         for (const contact of contacts) {
-          if ('id' in contact && contact.id) {
-            await adapter.upsertContact({
-              jid: contact.id as string,
-              name: (contact as any).name ?? null,
-              notify: (contact as any).notify ?? null,
-              verifiedName: (contact as any).verifiedName ?? null,
-              username: (contact as any).username ?? null,
-              phoneNumber: (contact as any).phoneNumber ?? null,
-              imgUrl: (contact as any).imgUrl ?? null,
-            });
-          }
+          await persistContact(contact);
         }
         for (const chat of chats) {
           if (chat.id) {
@@ -303,17 +345,22 @@ export const createWhatsAppConnector = (
 
       if (events['contacts.upsert']) {
         for (const contact of events['contacts.upsert']) {
-          if (!contact.id) continue;
-          await adapter.upsertContact({
-            jid: contact.id,
-            name: (contact as any).name ?? null,
-            notify: (contact as any).notify ?? null,
-            verifiedName: (contact as any).verifiedName ?? null,
-            username: (contact as any).username ?? null,
-            phoneNumber: (contact as any).phoneNumber ?? null,
-            imgUrl: (contact as any).imgUrl ?? null,
-          });
+          await persistContact(contact as BaileysContactLike);
         }
+      }
+
+      if (events['contacts.update']) {
+        for (const contact of events['contacts.update']) {
+          await persistContact(contact as BaileysContactLike);
+        }
+      }
+
+      if (events['lid-mapping.update']) {
+        const mapping = events['lid-mapping.update'] as {
+          lid?: string;
+          pn?: string;
+        };
+        await persistJidMapping(mapping.lid, mapping.pn);
       }
 
       if (events['messages.upsert']) {

@@ -98,11 +98,11 @@ The `latest.json` feed exists in addition to electron-updater's `latest-*.yml` b
 To ship a release that should NOT block existing users, set `MIN_SUPPORTED_VERSION` to a version older than (or equal to) the oldest installed build you still support:
 
 ```bash
-MIN_SUPPORTED_VERSION=0.1.0 CHAI_RELEASE=1 CHAI_PUBLISH=1 \
+MIN_SUPPORTED_VERSION=<oldest-supported-version> CHAI_RELEASE=1 CHAI_PUBLISH=1 \
   pnpm --filter chai release
 ```
 
-Result: anyone on `< 0.1.0` is still forced; anyone between `0.1.0` and (latest − 1) sees the optional sidebar banner; anyone on the latest is up-to-date.
+Result: anyone below `<oldest-supported-version>` is still forced; anyone between `<oldest-supported-version>` and the previous release sees the optional sidebar banner; anyone on the latest is up-to-date.
 
 Use the opt-out path for cosmetic fixes, non-breaking features, or anything where interrupting users would be disproportionate. Stay on the default (force everyone) for breaking DB migrations, security fixes, or connector/API contract changes that would make the old client misbehave.
 

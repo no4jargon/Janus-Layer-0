@@ -13,6 +13,7 @@
     "release:desktop": "pnpm --filter chai release",
     "app:rebuild": "pnpm --filter chai package",
     "app:rebuild-fresh": "rm -rf \"$HOME/Library/Application Support/Chai\" && pnpm --filter chai package",
+    "clear:app": "rm -rf \"$HOME/Library/Application Support/Chai\" \".dev-data\"",
     "db:wipe": "rm -f \"$HOME/Library/Application Support/Chai/data/app.db\" \"$HOME/Library/Application Support/Chai/data/app.db-shm\" \"$HOME/Library/Application Support/Chai/data/app.db-wal\"",
     "verify:data-paths": "pnpm --filter chai verify:data-paths",
     "test:migrations": "pnpm --filter @chai/db build && node ./scripts/test-migrations.js",

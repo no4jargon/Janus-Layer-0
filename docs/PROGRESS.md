@@ -1,14 +1,14 @@
 # Productization Progress Tracker
 
 Status: active
-Last updated: 2026-05-03
-Scope tracked here: desktop-first, local-first freelancer communications workspace derived from the original `Baileys/demo` prototype.
+Last updated: 2026-07-02
+Scope tracked here: desktop-first, local-first freelancer communications workspace.
 
 ## Overall status
 
-Current phase: **Phase 1–4 complete in code**, with one deliberate scope shift in distribution: builds ship **unsigned** via **GitHub Releases**, with a per-release `latest.json` driving a full-window forced-update screen on every prior version by default. Users click through to the GitHub release page in their browser to download and install the new installer. Auto-download / quit-and-install via `electron-updater` is intentionally not used because unsigned macOS binaries cannot self-replace; the wiring is left in place behind feature flags so it can be re-enabled if/when builds are signed.
+Current phase: **Phase 1-4 complete in code**, with one deliberate scope shift in distribution: builds ship **unsigned** via **GitHub Releases**, with a per-release `latest.json` driving a full-window forced-update screen on every prior version by default. Users click through to the GitHub release page in their browser to download and install the new installer. Auto-download / quit-and-install via `electron-updater` is intentionally not used because unsigned macOS binaries cannot self-replace; the wiring is left in place behind feature flags so it can be re-enabled if/when builds are signed.
 
-The first draft release (`v0.1.0`, 10 assets including `latest.json`) has been verified end-to-end. Outstanding work is QA against installed builds and the first non-zero version bump that actually exercises the forced-update path.
+The latest checked-in release candidate is `v0.1.11` (`apps/desktop/package.json`). Local `pnpm typecheck` and `pnpm test:migrations` were green on 2026-07-02. Outstanding work is QA against installed builds and a real forced-update dry run.
 
 Overall summary:
 - **Phase 0 is complete.**
@@ -17,7 +17,7 @@ Overall summary:
 - **Phase 3 is complete** — cluster CRUD + multi-select UX + AI workflow extraction panel ported from the demo, persisted in DB; settings + onboarding modals; cluster rename/recolor right-click menu.
 - **Phase 4 is complete in code** for the unsigned distribution model — diagnostics export, version-compare update checker, `latest.json` generation + upload, full-window forced-update screen, optional sidebar banner (both link to GitHub Releases for manual install), `pnpm release:desktop` builds + publishes installers and `latest.json` to a draft release.
 
-The renderer mirrors the demo prototype's UX 1:1: 3-pane layout (sidebar with WhatsApp / Email / Clusters tabs + More-channels menu, thread + composer, AI panel with cluster + lookback hours pickers). Cluster state moved from `localStorage` into the DB.
+The renderer is a 3-pane workspace: sidebar with WhatsApp / Email / Clusters tabs + More-channels menu, thread + composer, and AI panel with cluster + lookback hours pickers.
 
 ## Completed work
 
@@ -40,7 +40,7 @@ The renderer mirrors the demo prototype's UX 1:1: 3-pane layout (sidebar with Wh
 - [x] Replaced placeholder runners with real Electron + React/Vite wiring
 - [x] Added desktop packaging command (`pnpm package:desktop`)
 - [x] Added dev/prod data path conventions in code and smoke verification
-- [x] Added ADR for extraction strategy (`docs/ADR-001-phase0-extraction-strategy.md`)
+- [x] Established package boundaries for desktop, UI, core, DB, connectors, AI, prompts, and shared types
 
 ### Phase 1 completed
 - [x] Runtime bootstrap orchestration extracted into `@chai/core`
@@ -58,7 +58,7 @@ The renderer mirrors the demo prototype's UX 1:1: 3-pane layout (sidebar with Wh
 - [x] Gmail send outbox pipeline (`createGmailSendService`) wired through IPC
 - [x] WhatsApp connector on top of `baileys` (multi-file auth state, QR streaming, reconnect with backoff, mirror events)
 - [x] WhatsApp send outbox pipeline (`createWhatsAppSendService`)
-- [x] DB migrations: `001_init`, `002_email_mirror`, `003_whatsapp_mirror`, `004_wa_outbox`, `005_clusters_and_ai`
+- [x] DB migrations: `001_init`, `002_email_mirror`, `003_whatsapp_mirror`, `004_wa_outbox`, `005_clusters_and_ai`, `006_wa_reply_context`
 - [x] Attachment download UX (Electron save dialog, IPC at `chai:gmail:download-attachment`)
 - [x] Compose/reply UX for Gmail (toggle for new vs reply mode, To/Cc/Subject inputs)
 - [x] Compose UX for WhatsApp (Enter-to-send)
@@ -68,7 +68,7 @@ The renderer mirrors the demo prototype's UX 1:1: 3-pane layout (sidebar with Wh
 - [x] Cluster persistence schema (`clusters`, `cluster_members`, `ai_outputs`)
 - [x] Cluster CRUD IPC + multi-select with Cmd-click + Shift-click range
 - [x] Cluster grouping view in sidebar (Clusters tab)
-- [x] Ollama workflow extractor (`@chai/ai`) with the original prototype prompt
+- [x] Workflow extractor runtime (`@chai/ai`) and prompt package (`@chai/ai-prompts`)
 - [x] AI panel: cluster picker + lookback hours pickers + run-for-cluster + run-for-all + collated output rendering
 - [x] Cheat code (`wipeclusters` to clear all, Cmd/Ctrl+E for cheat list)
 - [x] Coming-soon channels banner (Slack / Teams / Discord / Telegram placeholder)
@@ -84,7 +84,7 @@ The renderer mirrors the demo prototype's UX 1:1: 3-pane layout (sidebar with Wh
 - [x] Optional-update banner in the sidebar (only fires when `MIN_SUPPORTED_VERSION` is opted out below `latestVersion`); links to GitHub release page; dismissable.
 - [x] electron-builder release config (mac dmg + zip, win nsis, linux AppImage) with `provider: github` for `no4jargon/Janus-Layer-0`. `pnpm release:desktop` toggles between unsigned-dir (default) and unsigned-release-publish modes via `CHAI_RELEASE=1`. `CSC_*` / `APPLE_*` signing env vars are still wired so signing can be turned on later without code changes.
 - [x] Update artifact hosting: GitHub Releases. `apps/desktop/electron/package.js` writes `dist/latest.json` per release (with `MIN_SUPPORTED_VERSION` defaulting to the new version → forces every prior build) and uploads it via `gh release upload` when `CHAI_PUBLISH=1`.
-- [x] First draft release (`v0.1.0`) verified end-to-end on GitHub: `latest.json` + `latest-mac.yml` + 4 installers (arm64 + x64 dmg/zip) + 4 blockmaps uploaded as a draft.
+- [x] Release pipeline has produced tagged beta candidates through `v0.1.11`; current candidate uses `apps/desktop/package.json` version `0.1.11`.
 - [x] Migration testing harness (`scripts/test-migrations.js`) — fresh bootstrap, idempotency, v1-baseline upgrade with row preservation; runs via `pnpm test:migrations`
 - [x] CI workflow: `.github/workflows/ci.yml` runs install + build + typecheck + migrations test + verify on every PR
 - [x] Release workflow: `.github/workflows/release.yml` triggers on `v*` tag push (or manual dispatch); builds + publishes draft release + `latest.json` using the repo's `GITHUB_TOKEN` (no PAT needed)
@@ -119,13 +119,13 @@ Status: code complete (diagnostics, updater download/install, required + optiona
 - Workflow extraction calls `OLLAMA_BASE_URL` (default `127.0.0.1:11434`) with `OLLAMA_MODEL` (default `llama3:8b`). Requires Ollama running locally; otherwise the AI panel surfaces an error.
 
 ### 3. Update/migration complexity
-- Forced-update flow has not yet been exercised against a real install — the first GitHub release with `MIN_SUPPORTED_VERSION` set should be treated as a load-bearing test.
+- Forced-update flow still needs to be exercised against a real installed older build and the current release feed.
 - The release script's `gh release upload` step assumes `gh` CLI + a `GH_TOKEN` with `contents: write`; if that step is silently skipped, the JSON feed gets stale and forced updates won't trigger. Verify after the first publish.
 
 ## Immediate next steps
 
-1. Promote the verified `v0.1.0` draft to a published release; install it on at least one Mac and one Windows machine; record `<data>/logs/app.log` location + diagnostics export shape per `docs/QA_PLAN.md` section 8.
-2. Cut a `v0.1.1` test release with `MIN_SUPPORTED_VERSION=0.1.1` set; confirm the installed `v0.1.0` lands directly on the **Update required** screen on next launch and stays there until the new installer is run.
-3. Cut a `v0.1.2` opt-out release with `MIN_SUPPORTED_VERSION=0.1.0` set; confirm the installed `v0.1.0` shows the optional sidebar banner instead of the blocking screen.
-4. Run the full friends/family QA pass (`docs/QA_PLAN.md` sections 1–7) and update section 9's regression watchlist.
-5. (Later) provision Apple / Microsoft signing credentials and re-bind the renderer's update buttons to the in-app `electron-updater` flow that's still wired but unused.
+1. Verify the GitHub release for `v0.1.11`: draft/published state, macOS + Windows assets, `latest.json`, and intended `minSupportedVersion`.
+2. Install `v0.1.11` on at least one Mac and one Windows machine; run the full friends/family QA pass (`docs/QA_PLAN.md` sections 1-7).
+3. Forced-update dry run: install a known older build, stage or publish an N+1 feed with `minSupportedVersion` above the installed version, and confirm launch lands directly on **Update required**.
+4. Optional-update dry run: stage or publish a feed where `latestVersion` is newer but `minSupportedVersion` still allows the installed version; confirm the sidebar banner path.
+5. After QA is green, provision Apple / Microsoft signing credentials and re-bind the renderer's update buttons to the in-app `electron-updater` flow that's still wired but unused.

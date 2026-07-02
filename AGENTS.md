@@ -7,9 +7,9 @@ Scope: repository root (`.`)
 Before making changes or proposing implementation work, read:
 1. `docs/PLAN.md`
 2. `docs/PROGRESS.md`
-3. `docs/REPO_BOOTSTRAP.md` when work touches repo setup, packaging, or dev/prod workflow
-4. `README.md`
-5. `docs/PROTOTYPE_MIGRATION_MAP.md` when work touches imported prototype code
+3. `docs/RELEASE.md` when work touches packaging, releases, or update behavior
+4. `docs/QA_PLAN.md` when work touches user-facing flows
+5. `README.md`
 
 ## Purpose
 
@@ -34,13 +34,13 @@ This repository is the standalone product workspace for a **desktop-first, local
 - Refer to `docs/PLAN.md` before suggesting structural or architectural changes.
 - Refer to `docs/PROGRESS.md` before claiming work is started/completed.
 - Keep both files updated when phase status, blockers, or major decisions change.
-- Treat imported `prototype-*` files as reference material to be refactored behind package boundaries.
 - Prefer changes that support the planned direction:
   - desktop-first
   - local-first
   - privacy-first
   - no server-side user message storage
 - Flag any change that conflicts with the plan.
+- Historical prototype source copies were removed after the production package boundaries landed; use git history if legacy reference is needed.
 
 ## Documentation rules
 
@@ -59,3 +59,11 @@ If any of the following change, update plan/progress/docs accordingly:
 - Do not assume a hosted backend for storing user communications.
 - Do not treat mobile as equal-scope with desktop for v1 unless the plan is explicitly changed.
 - Assume updates and DB migrations must eventually be supportable for non-technical users.
+
+## Local app reset convention
+
+When the user says "clear the app", interpret that as clearing everything related to Chai unless they specify a narrower scope. On macOS, this includes deleting the entire app data directory:
+
+`~/Library/Application Support/Chai`
+
+When working in development mode, also include repo-local development data such as `.dev-data`. Because this is destructive and can target files outside the workspace, confirm the exact paths and request escalation before deleting.

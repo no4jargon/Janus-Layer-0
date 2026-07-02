@@ -26,6 +26,7 @@ const silentLogger = {
 const CHAT_JID = '120363000000000000@g.us';
 const PARENT_SENDER_JID = '15551110000@s.whatsapp.net';
 const REPLY_SENDER_JID = '15552220000@s.whatsapp.net';
+const LID_SENDER_JID = '54859717935330@lid';
 
 const baseMessage = (overrides: Partial<WaMessageRecord>): WaMessageRecord => ({
   messageKey: '',
@@ -49,7 +50,7 @@ const baseMessage = (overrides: Partial<WaMessageRecord>): WaMessageRecord => ({
   ...overrides,
 });
 
-describe('WhatsApp reply-context round-trip', () => {
+describe('WhatsApp store', () => {
   let tmpDir: string;
   let store: ReturnType<typeof createWhatsAppStore>;
   let db: ReturnType<typeof bootstrapDatabase>['db'];
@@ -165,5 +166,37 @@ describe('WhatsApp reply-context round-trip', () => {
     assert.equal(enriched[0].replyToStanzaId, 'MISSING_PARENT_ID');
     assert.equal(enriched[0].replyToText, null);
     assert.equal(enriched[0].replyToSenderJid, null);
+  });
+
+  it('resolves display names through LID-to-phone-number mappings', () => {
+    store.upsertContact({
+      jid: LID_SENDER_JID,
+    });
+    store.upsertContact({
+      jid: PARENT_SENDER_JID,
+      name: 'Shilpi Shah',
+    });
+    store.upsertJidMapping(LID_SENDER_JID, PARENT_SENDER_JID);
+
+    assert.equal(store.resolveDisplayName(LID_SENDER_JID), 'Shilpi Shah');
+  });
+
+  it('uses mapped contact names for direct chat titles', () => {
+    store.upsertChat({
+      jid: LID_SENDER_JID,
+      isGroup: false,
+      lastMessageTs: 1_700_000_180,
+      lastMessageText: 'see you then',
+      lastMessageType: 'conversation',
+    });
+    store.upsertContact({
+      jid: PARENT_SENDER_JID,
+      name: 'Shilpi Shah',
+    });
+    store.upsertJidMapping(LID_SENDER_JID, PARENT_SENDER_JID);
+
+    const [chat] = store.getChats(1);
+    assert.equal(chat.jid, LID_SENDER_JID);
+    assert.equal(chat.name, 'Shilpi Shah');
   });
 });

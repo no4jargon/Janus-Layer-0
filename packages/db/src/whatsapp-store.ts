@@ -302,7 +302,11 @@ export const createWhatsAppStore = (db: Database) => {
              NULLIF(TRIM(ct.name), ''),
              NULLIF(TRIM(ct.notify), ''),
              NULLIF(TRIM(ct.verified_name), ''),
-             NULLIF(TRIM(ct.username), '')
+             NULLIF(TRIM(ct.username), ''),
+             NULLIF(TRIM(mapped_ct.name), ''),
+             NULLIF(TRIM(mapped_ct.notify), ''),
+             NULLIF(TRIM(mapped_ct.verified_name), ''),
+             NULLIF(TRIM(mapped_ct.username), '')
            ) AS name,
            c.is_group,
            c.last_message_ts,
@@ -311,6 +315,11 @@ export const createWhatsAppStore = (db: Database) => {
            c.unread
          FROM wa_chats c
          LEFT JOIN wa_contacts ct ON ct.jid = c.jid
+         LEFT JOIN wa_contacts mapped_ct
+           ON mapped_ct.jid = COALESCE(
+             (SELECT target_jid FROM wa_jid_map WHERE source_jid = c.jid LIMIT 1),
+             (SELECT source_jid FROM wa_jid_map WHERE target_jid = c.jid LIMIT 1)
+           )
          ORDER BY c.last_message_ts DESC
          LIMIT ?`,
       )
@@ -377,15 +386,30 @@ export const createWhatsAppStore = (db: Database) => {
 
   const resolveDisplayName = (jid: string | null | undefined): string | null => {
     if (!jid) return null;
-    const c = getContact(jid);
-    if (!c) return null;
-    return (
-      trimmedOrNull(c.name) ||
-      trimmedOrNull(c.notify) ||
-      trimmedOrNull(c.verifiedName) ||
-      trimmedOrNull(c.username) ||
-      null
-    );
+    const row = db
+      .prepare(
+        `SELECT
+           COALESCE(
+             NULLIF(TRIM(ct.name), ''),
+             NULLIF(TRIM(ct.notify), ''),
+             NULLIF(TRIM(ct.verified_name), ''),
+             NULLIF(TRIM(ct.username), ''),
+             NULLIF(TRIM(mapped_ct.name), ''),
+             NULLIF(TRIM(mapped_ct.notify), ''),
+             NULLIF(TRIM(mapped_ct.verified_name), ''),
+             NULLIF(TRIM(mapped_ct.username), '')
+           ) AS name
+         FROM (SELECT ? AS jid) lookup
+         LEFT JOIN wa_contacts ct ON ct.jid = lookup.jid
+         LEFT JOIN wa_contacts mapped_ct
+           ON mapped_ct.jid = COALESCE(
+             (SELECT target_jid FROM wa_jid_map WHERE source_jid = lookup.jid LIMIT 1),
+             (SELECT source_jid FROM wa_jid_map WHERE target_jid = lookup.jid LIMIT 1)
+           )
+         LIMIT 1`,
+      )
+      .get(jid) as any;
+    return trimmedOrNull(row?.name);
   };
 
   const createWaOutboxMessage = (

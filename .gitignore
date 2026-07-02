@@ -3,6 +3,7 @@ node_modules
 .dev-data
 .prod-data-smoke
 .DS_Store
+.claude/
 dist
 coverage
 *.log
