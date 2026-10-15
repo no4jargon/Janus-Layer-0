@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, mock, test } from 'node:test';
@@ -7,10 +7,12 @@ import { afterEach, beforeEach, mock, test } from 'node:test';
 // Exercise the connector's real event/lifecycle code without pairing, network
 // requests, a WhatsApp send, or any real account files.
 const { default: _baileysDefault, ...baileys } = await import('baileys');
+const { default: fsDefault, ...fs } = await import('node:fs');
 const sockets: FakeSocket[] = [];
 const state = { creds: {}, keys: {} };
-let loadAuth = async () => ({ state, saveCreds: async () => {} });
+let loadAuth = async (_sessionDir: string) => ({ state, saveCreds: async () => {} });
 let loadVersion = async () => ({ version: [2, 3000, 1] });
+let renameSession = fs.renameSync;
 
 class FakeSocket {
   handler: ((events: Record<string, unknown>) => void | Promise<void>) | null = null;
@@ -38,7 +40,7 @@ class FakeSocket {
 mock.module('baileys', {
   namedExports: {
     ...baileys,
-    useMultiFileAuthState: () => loadAuth(),
+    useMultiFileAuthState: (sessionDir: string) => loadAuth(sessionDir),
     fetchLatestBaileysVersion: () => loadVersion(),
     makeCacheableSignalKeyStore: (keys: unknown) => keys,
     makeWASocket: () => {
@@ -46,6 +48,14 @@ mock.module('baileys', {
       sockets.push(socket);
       return socket;
     },
+  },
+});
+
+mock.module('node:fs', {
+  defaultExport: fsDefault,
+  namedExports: {
+    ...fs,
+    renameSync: (...args: Parameters<typeof fs.renameSync>) => renameSession(...args),
   },
 });
 
@@ -68,6 +78,7 @@ beforeEach(() => {
   onChat = async () => {};
   loadAuth = async () => ({ state, saveCreds: async () => {} });
   loadVersion = async () => ({ version: [2, 3000, 1] });
+  renameSession = fs.renameSync;
   connector = createWhatsAppConnector({
     keystoreDir: directory,
     logger,
@@ -184,4 +195,69 @@ test('ordinary disconnect logs out before ending the socket and removes local au
   assert.equal(existsSync(path.join(directory, 'whatsapp-session')), false);
   assert.equal(connector.getStatus().reconnectCount, 0);
   assert.equal(connector.getActiveSocket(), null);
+});
+
+test('explicit connect after logout preserves expired auth privately and starts fresh pairing', async () => {
+  const socket = await open();
+  await socket.emit({
+    'connection.update': {
+      connection: 'close',
+      lastDisconnect: { error: { output: { statusCode: baileys.DisconnectReason.loggedOut } } },
+    },
+  });
+  assert.equal(connector.getStatus().loggedOut, true);
+  assert.equal(sockets.length, 1, 'logout does not automatically restart pairing');
+
+  let authLoads = 0;
+  loadAuth = async (sessionDir) => {
+    authLoads += 1;
+    assert.equal(existsSync(path.join(sessionDir, 'creds.json')), false);
+    writeFileSync(path.join(sessionDir, 'creds.json'), 'fresh credentials');
+    return { state, saveCreds: async () => {} };
+  };
+  const connecting = connector.connect();
+  await flush();
+  const replacement = sockets.at(-1)!;
+  await replacement.emit({ 'connection.update': { qr: 'fresh-qr' } });
+  assert.equal(connector.getStatus().lastQr, 'fresh-qr');
+  assert.equal(connector.getStatus().loggedOut, false);
+  const backups = readdirSync(directory).filter((name) => name.startsWith('whatsapp-session.expired-'));
+  assert.equal(backups.length, 1);
+  assert.equal(readFileSync(path.join(directory, backups[0], 'creds.json'), 'utf8'),
+    'preserved credentials');
+  if (process.platform !== 'win32') {
+    assert.equal(statSync(path.join(directory, backups[0])).mode & 0o777, 0o700);
+  }
+  assert.equal(readFileSync(path.join(directory, 'whatsapp-session/creds.json'), 'utf8'),
+    'fresh credentials');
+  assert.equal(authLoads, 1);
+  assert.deepEqual(writes, [], 'pairing recovery does not change mirrored chats or messages');
+  await replacement.emit({ 'connection.update': { connection: 'open' } });
+  await connecting;
+  assert.equal(connector.getActiveSocket(), replacement);
+});
+
+test('failed expired-session backup keeps credentials and permits a safe retry', async () => {
+  const socket = await open();
+  await socket.emit({
+    'connection.update': {
+      connection: 'close',
+      lastDisconnect: { error: { output: { statusCode: baileys.DisconnectReason.loggedOut } } },
+    },
+  });
+  renameSession = () => { throw new Error('simulated backup failure'); };
+  await assert.rejects(connector.connect(), /Could not preserve the expired WhatsApp session/);
+  assert.equal(connector.getStatus().loggedOut, true);
+  assert.equal(sockets.length, 1, 'backup failure cannot start Baileys with the expired auth');
+  assert.equal(readFileSync(path.join(directory, 'whatsapp-session/creds.json'), 'utf8'),
+    'preserved credentials');
+  assert.deepEqual(readdirSync(directory), ['whatsapp-session']);
+  assert.deepEqual(writes, []);
+
+  renameSession = fs.renameSync;
+  const connecting = connector.connect();
+  await flush();
+  await sockets.at(-1)!.emit({ 'connection.update': { connection: 'open' } });
+  await connecting;
+  assert.equal(connector.getStatus().connected, true);
 });

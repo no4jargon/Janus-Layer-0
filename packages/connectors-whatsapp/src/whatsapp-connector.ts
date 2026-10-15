@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { chmodSync, existsSync, mkdirSync, renameSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { Boom } from '@hapi/boom';
 import P, { type Logger as PinoLogger } from 'pino';
@@ -130,7 +131,24 @@ export const createWhatsAppConnector = (
   };
 
   const ensureSessionDir = () => {
-    mkdirSync(sessionDir, { recursive: true });
+    mkdirSync(sessionDir, { recursive: true, mode: 0o700 });
+  };
+
+  const preserveExpiredSession = () => {
+    if (!existsSync(sessionDir)) return;
+    const backupDir = `${sessionDir}.expired-${Date.now()}-${randomUUID()}`;
+    try {
+      // The credentials stay on-device for recovery, inaccessible to other
+      // local users, while Baileys gets an empty directory for fresh pairing.
+      chmodSync(sessionDir, 0o700);
+      renameSync(sessionDir, backupDir);
+    } catch (error) {
+      logger.error('whatsapp expired session backup failed', { error: String(error) });
+      throw new Error('Could not preserve the expired WhatsApp session. Try connecting again.', {
+        cause: error,
+      });
+    }
+    logger.info('whatsapp expired session preserved', { backupDir });
   };
 
   const normalizeUserJid = (value: unknown): string | null => {
@@ -325,7 +343,7 @@ export const createWhatsAppConnector = (
         });
         if (connectedDeferred) {
           connectedDeferred.reject(
-            new Error('WhatsApp logged out. Reset session to re-pair.'),
+            new Error('WhatsApp logged out. Connect again to re-pair.'),
           );
           connectedDeferred = null;
         }
@@ -568,8 +586,20 @@ export const createWhatsAppConnector = (
     cancelReconnect();
     teardownSocket();
     rejectPendingConnection(new Error('WhatsApp connection was replaced'));
+    if (loggedOut) {
+      const generation = socketGeneration;
+      // An accepted creds.update may still be writing to this directory.
+      // Finish it before moving the expired session and starting a new one.
+      await Promise.allSettled([...pendingEvents]);
+      if (disposed) throw new Error('WhatsApp connector has been disposed');
+      if (socketGeneration !== generation) {
+        throw new Error('WhatsApp connection was replaced');
+      }
+      preserveExpiredSession();
+    }
     pairedAt = null;
     loggedOut = false;
+    lastQr = null;
     reconnectCount = 0;
 
     const completion = new Promise<void>((resolve, reject) => {

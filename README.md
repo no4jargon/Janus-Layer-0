@@ -10,9 +10,9 @@ The living project references are:
 
 ## Current status
 
-Phases 1-4 are **code complete** for v1. The desktop app version is owned by `apps/desktop/package.json`; the latest checked-in release candidate is `v0.1.12`.
+Phases 1-4 are **code complete** for v1. The desktop app version is owned by `apps/desktop/package.json`; the latest checked-in release candidate is `v0.1.13`.
 
-The v0.1.12 local Mac build has passed bridge lifecycle and required/optional update smoke checks. Account pairing, Windows installed UI QA, and signing remain operational acceptance steps; see `docs/PROGRESS.md`.
+Local Mac builds have passed bridge lifecycle and required/optional update smoke checks; v0.1.13 also passed live expired-session recovery to a fresh pairing QR. Account pairing, Windows installed UI QA, and signing remain operational acceptance steps; see `docs/PROGRESS.md`.
 
 The renderer is a 3-pane workspace: sidebar with WhatsApp / Email / Clusters tabs, thread + composer, and AI insights panel. The shell wraps it with first-run onboarding, a settings modal, migration recovery, optional-update banner, and required-update enforcement screen.
 
@@ -60,7 +60,7 @@ The bearer token is written to `<data>/agent-bridge.json` and is visible as a to
 For investment-run notifications to the WhatsApp Notes group, see
 [`docs/INVESTMENT_NOTIFICATIONS.md`](docs/INVESTMENT_NOTIFICATIONS.md). The
 `scripts/chai-notify.py` helper resolves and pins the group, then checks the
-nested send result. The bridge is included starting with `v0.1.12`. See
+nested send result. The bridge is included starting with `v0.1.13`. See
 [`docs/AGENT_BRIDGE.md`](docs/AGENT_BRIDGE.md) for authentication and tool usage.
 
 ## Reset commands (macOS)

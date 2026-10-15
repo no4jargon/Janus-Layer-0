@@ -131,7 +131,7 @@ The plan calls for `dev` / `beta` / `stable` channels. For now the beta channel 
 - Override at release time with `CHAI_RELEASE_CHANNEL` (used by `latest.json` generation).
 - Don't move to `stable` until the updater has been exercised against real installs and the migration test harness has run cleanly across the previous N releases.
 
-## 7. Release checklist for v0.1.12 and later
+## 7. Release checklist for v0.1.13 and later
 
 1. Bump only `apps/desktop/package.json`, add release notes under
    `docs/releases/`, and commit the reviewed source plus lockfile.

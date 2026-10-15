@@ -391,7 +391,7 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
       setWaQr(status.lastQr);
       sawWaQrRef.current = Boolean(status.lastQr);
       if (status.connected) setWaConnectionText('WhatsApp connected');
-      else if (status.loggedOut) setWaConnectionText('Logged out. Reset to re-pair.');
+      else if (status.loggedOut) setWaConnectionText('Logged out. Click Connect WhatsApp to pair again.');
       else if (status.lastQr) setWaConnectionText('Scan QR to login');
       else if (status.reconnectCount > 0) setWaConnectionText('Disconnected. Reconnecting…');
       else setWaConnectionText('WhatsApp disconnected');
@@ -555,7 +555,7 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
       } else if (event.type === 'pairing-failed') {
         setWaConnected(false);
         setWaQr(null);
-        setWaConnectionText('Logged out. Reset to re-pair.');
+        setWaConnectionText('Logged out. Click Connect WhatsApp to pair again.');
       } else if (
         event.type === 'chat-update' ||
         event.type === 'message-upsert' ||

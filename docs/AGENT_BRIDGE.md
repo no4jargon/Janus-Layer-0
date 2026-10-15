@@ -1,6 +1,6 @@
 # Local agent bridge
 
-Chai v0.1.12 includes a bridge for trusted agents running on the same computer.
+Chai v0.1.13 includes a bridge for trusted agents running on the same computer.
 Launch Chai once, then open Settings → Local agent bridge to see its status,
 endpoints, token-file path, and recent activity.
 

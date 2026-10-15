@@ -6,9 +6,9 @@ not read iPhone SMS or collect investment balances.
 
 ## Installation and release distinction
 
-Before the v0.1.12 publishing run on 2026-10-15, the latest published GitHub release was `v0.1.9`; `v0.1.10` and
-`v0.1.11` were drafts. The published/tagged code does not include the local agent
-bridge. The v0.1.12 release adds it. Use a build that includes
+Before the v0.1.13 publishing run on 2026-10-15, the latest published GitHub release was `v0.1.9`; `v0.1.10` and
+`v0.1.11` were drafts. The published v0.1.9 code does not include the local agent
+bridge. The v0.1.13 release adds it; v0.1.12 remains a superseded draft. Use a build that includes
 `@chai/agent-bridge` for scripted notifications. Do not infer bridge availability
 from an installer version alone.
 

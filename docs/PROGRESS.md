@@ -8,7 +8,7 @@ Scope tracked here: desktop-first, local-first freelancer communications workspa
 
 Current phase: **Phase 1-4 complete in code**, with one deliberate scope shift in distribution: builds ship **unsigned** via **GitHub Releases**, with a per-release `latest.json` driving a full-window forced-update screen on every prior version by default. Users click through to the GitHub release page in their browser to download and install the new installer. Auto-download / quit-and-install via `electron-updater` is intentionally not used because unsigned macOS binaries cannot self-replace; the wiring is left in place behind feature flags so it can be re-enabled if/when builds are signed.
 
-The current release candidate is `v0.1.12` (`apps/desktop/package.json`), including the local agent bridge and WhatsApp repairs. Release validation is in progress on 2026-10-15. Installed cross-platform account QA remains a separate acceptance step.
+The current release candidate is `v0.1.13` (`apps/desktop/package.json`), including the local agent bridge and WhatsApp repairs. Release validation is in progress on 2026-10-15. Installed cross-platform account QA remains a separate acceptance step.
 
 Overall summary:
 - **Phase 0 is complete.**
@@ -130,21 +130,22 @@ Status: code complete (diagnostics, updater download/install, required + optiona
 
 ### 3. Update/migration complexity
 - Forced-update flow still needs to be exercised against a real installed older build and the current release feed.
-- The release script's `gh release upload` step assumes `gh` CLI + a `GH_TOKEN` with `contents: write`; if that step is silently skipped, the JSON feed gets stale and forced updates won't trigger. Verify after the first publish.
+- The release script's `gh release upload` step assumes `gh` CLI + a `GH_TOKEN` with `contents: write`; feed upload failures now fail the command. Verify the public feed after publishing.
 
 ## Bridge release validation — 2026-10-15
 
 - Completed the authenticated loopback MCP/RPC bridge, strict host/origin and protocol handling, private effective token persistence, accurate per-recipient send confirmation, and stable request IDs with persisted conflict protection.
 - Response watches expose instructions, pin resolved identities, survive restart, support pause/resume, and drain backlogs. The desktop refreshes tasks on startup, message events, and a 30-second timer; no automatic replies are sent.
-- Added session-preserving WhatsApp disposal for retry/quit, current QR/status restoration when reopening a window, and preview preservation on metadata-only chat updates.
-- Local validation passed: frozen-lockfile install, workspace build/typecheck, 11 bridge tests, 8 store tests, 7 connector lifecycle tests, 6 prompt tests, 21 notification tests, fresh/idempotent/upgrade migration harness, and data-path smoke checks.
+- Added session-preserving WhatsApp disposal for retry/quit, current QR/status restoration when reopening a window, and preview preservation on metadata-only chat updates. Explicit reconnect after logout now backs up expired auth privately and opens a fresh pairing session.
+- Local validation passed: frozen-lockfile install, workspace build/typecheck, 11 bridge tests, 8 store tests, 9 connector lifecycle tests, 6 prompt tests, 21 notification tests, fresh/idempotent/upgrade migration harness, and data-path smoke checks.
 - Built and installed `/Applications/Chai.app` version 0.1.12 without clearing existing user data. Packaged-app checks passed for startup/migrations, bridge health, authenticated MCP initialization/tool discovery, rejection of unauthenticated/foreign-origin calls, renderer bridge status, required-update blocking, optional-update banner, close/reopen, quit/port closure, and restart/token preservation.
-- Release CI now requires app OAuth configuration, validates tag/version/update policy, builds both Mac architectures plus Windows x64, and verifies every installer and feed while keeping the release a draft. Existing `v0.1.10` and `v0.1.11` drafts are preserved.
-- Publishing `v0.1.12` is in progress. The local Mac app is unsigned; Windows account/UI QA, manual phone pairing, Gmail OAuth acceptance, and live notification delivery remain unverified.
+- Installed the corrected `/Applications/Chai.app` version 0.1.13. Local bridge health and authenticated MCP discovery passed again; explicit reconnect of the actual logged-out session produced a fresh on-device QR and preserved the expired credentials in a private backup. Notes is pinned in the local notification-helper configuration; manual phone pairing and live send confirmation are pending.
+- Release CI now requires app OAuth configuration, validates tag/version/update policy, builds both Mac architectures plus Windows x64, and verifies every installer and feed while keeping the release a draft. Existing `v0.1.10` and `v0.1.11` drafts are preserved. `v0.1.12` is retained as an unpublished draft after a live logged-out pairing check exposed a recovery bug; `v0.1.13` adds the correction.
+- Publishing `v0.1.13` is in progress. The local Mac app is unsigned; Windows account/UI QA, manual phone pairing, Gmail OAuth acceptance, and live notification delivery remain unverified.
 
 ## Immediate next steps
 
-1. Complete the `v0.1.12` macOS/Windows release workflow, review its assets/feed, publish, and verify the public `latest.json` reports the intended minimum version.
+1. Complete the `v0.1.13` macOS/Windows release workflow, review its assets/feed, publish, and verify the public `latest.json` reports the intended minimum version.
 2. Pair WhatsApp manually in the installed Mac app, verify reconnect, configure the exact Notes group, and run an explicitly authorized live notification test.
 3. Complete Gmail account acceptance and the Windows installed UI checklist in `docs/QA_PLAN.md`.
 4. Provision Apple / Microsoft signing credentials after beta QA; the current distribution uses unsigned manual installers.
