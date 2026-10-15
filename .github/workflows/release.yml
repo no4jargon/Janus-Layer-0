@@ -19,6 +19,10 @@ on:
         type: choice
         options: [beta, stable]
         default: beta
+      verify_only:
+        description: 'Verify an existing draft and its feeds without rebuilding installers'
+        type: boolean
+        default: false
 
 concurrency:
   group: release-${{ inputs.ref || github.ref }}
@@ -91,6 +95,7 @@ jobs:
 
   release:
     needs: prepare
+    if: ${{ !inputs.verify_only }}
     runs-on: macos-latest
     timeout-minutes: 45
     permissions:
@@ -161,6 +166,7 @@ jobs:
 
   release-windows:
     needs: prepare
+    if: ${{ !inputs.verify_only }}
     runs-on: windows-latest
     timeout-minutes: 45
     permissions:
@@ -229,17 +235,26 @@ jobs:
     needs: [prepare, release, release-windows]
     runs-on: ubuntu-latest
     if: always()
+    # GitHub draft releases require write access even for metadata/downloads.
+    permissions:
+      contents: write
     steps:
       - name: Check platform results
         env:
           PREPARE_RESULT: ${{ needs.prepare.result }}
           MAC_RESULT: ${{ needs.release.result }}
           WINDOWS_RESULT: ${{ needs.release-windows.result }}
+          VERIFY_ONLY: ${{ inputs.verify_only || false }}
         run: |
           echo "Prepare: $PREPARE_RESULT; macOS: $MAC_RESULT; Windows: $WINDOWS_RESULT"
           test "$PREPARE_RESULT" = success
-          test "$MAC_RESULT" = success
-          test "$WINDOWS_RESULT" = success
+          if [ "$VERIFY_ONLY" = true ]; then
+            test "$MAC_RESULT" = skipped
+            test "$WINDOWS_RESULT" = skipped
+          else
+            test "$MAC_RESULT" = success
+            test "$WINDOWS_RESULT" = success
+          fi
 
       - uses: actions/setup-node@v4
         with:
