@@ -7,30 +7,104 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Tag or commit to build (must be a tag of the form v* if you want it visible to clients)'
+        description: 'Existing version tag or its commit to build (must match apps/desktop/package.json)'
         required: false
         default: ''
       min_supported_version:
-        description: 'Lowest version still allowed to run. Defaults to the release version (forces every prior version to update). Set lower for an opt-out release.'
+        description: 'Lowest version still allowed to run. Defaults to the release version. Set lower to allow older clients.'
         required: false
         default: ''
       channel:
-        description: 'Release channel embedded in latest.json (beta or stable)'
-        required: false
-        default: 'beta'
+        description: 'Release channel embedded in latest.json'
+        type: choice
+        options: [beta, stable]
+        default: beta
+
+concurrency:
+  group: release-${{ inputs.ref || github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
-  release:
-    runs-on: macos-latest
-    timeout-minutes: 30
+  prepare:
+    runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      tag: ${{ steps.validate.outputs.tag }}
+      version: ${{ steps.validate.outputs.version }}
+      min_supported_version: ${{ steps.validate.outputs.min_supported_version }}
+      channel: ${{ steps.validate.outputs.channel }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Validate release tag and update policy
+        id: validate
+        env:
+          MIN_SUPPORTED_VERSION: ${{ inputs.min_supported_version }}
+          CHAI_RELEASE_CHANNEL: ${{ inputs.channel || 'beta' }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
+          import { appendFileSync, readFileSync } from 'node:fs';
+          const { version } = JSON.parse(readFileSync('apps/desktop/package.json', 'utf8'));
+          const validVersion = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+          assert(validVersion.test(version), 'Desktop version must be major.minor.patch');
+          const tag = `v${version}`;
+          const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
+          assert.equal(git('rev-parse', `${tag}^{commit}`), git('rev-parse', 'HEAD'), `Checkout must match existing ${tag} tag`);
+          const min = process.env.MIN_SUPPORTED_VERSION || version;
+          assert(validVersion.test(min), 'Minimum supported version must be major.minor.patch');
+          const left = min.split('.').map(Number);
+          const right = version.split('.').map(Number);
+          const firstDifference = left.findIndex((part, index) => part !== right[index]);
+          assert(firstDifference < 0 || left[firstDifference] < right[firstDifference], 'Minimum supported version cannot exceed the release version');
+          const channel = process.env.CHAI_RELEASE_CHANNEL;
+          assert(['beta', 'stable'].includes(channel), 'Channel must be beta or stable');
+          appendFileSync(process.env.GITHUB_OUTPUT, `tag=${tag}\nversion=${version}\nmin_supported_version=${min}\nchannel=${channel}\n`);
+          NODE
+
+      - name: Create or verify draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.validate.outputs.tag }}
+        run: |
+          if draft=$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft); then
+            if [ "$draft" != "true" ]; then
+              echo "Refusing to overwrite published release $RELEASE_TAG" >&2
+              exit 1
+            fi
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft --title "$RELEASE_TAG"
+          fi
+
+  release:
+    needs: prepare
+    runs-on: macos-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    env:
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || github.ref }}
+          ref: ${{ needs.prepare.outputs.tag }}
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -43,6 +117,13 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      - name: Check Gmail release configuration
+        run: |
+          if [ -z "$GOOGLE_CLIENT_ID" ] || [ -z "$GOOGLE_CLIENT_SECRET" ]; then
+            echo "Configure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET repository secrets before releasing; otherwise Gmail cannot connect." >&2
+            exit 1
+          fi
+
       - name: Install
         run: pnpm install --frozen-lockfile
 
@@ -52,18 +133,23 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Migration tests
-        run: pnpm test:migrations
+      - name: Bridge and data regression tests
+        run: |
+          pnpm --filter @chai/db test
+          pnpm --filter @chai/agent-bridge test
+          pnpm --filter @chai/connectors-whatsapp test
+          pnpm --filter @chai/ai-prompts test
+          python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+          pnpm test:migrations
+          pnpm verify:data-paths
 
-      - name: Build + publish release
+      - name: Build + publish macOS release
         env:
-          # electron-builder reads GH_TOKEN; the workflow's auto-injected
-          # GITHUB_TOKEN already has `contents: write` from the permissions block.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CHAI_RELEASE: '1'
           CHAI_PUBLISH: '1'
-          CHAI_RELEASE_CHANNEL: ${{ inputs.channel || 'beta' }}
-          MIN_SUPPORTED_VERSION: ${{ inputs.min_supported_version }}
+          CHAI_RELEASE_CHANNEL: ${{ needs.prepare.outputs.channel }}
+          MIN_SUPPORTED_VERSION: ${{ needs.prepare.outputs.min_supported_version }}
         run: pnpm --filter chai release
 
       - name: Upload latest.json artifact
@@ -71,19 +157,24 @@ jobs:
         with:
           name: latest-json
           path: apps/desktop/dist/latest.json
-          if-no-files-found: warn
+          if-no-files-found: error
 
   release-windows:
+    needs: prepare
     runs-on: windows-latest
     timeout-minutes: 45
     permissions:
       contents: write
+    env:
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || github.ref }}
+          ref: ${{ needs.prepare.outputs.tag }}
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -96,6 +187,14 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      - name: Check Gmail release configuration
+        shell: bash
+        run: |
+          if [ -z "$GOOGLE_CLIENT_ID" ] || [ -z "$GOOGLE_CLIENT_SECRET" ]; then
+            echo "Configure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET repository secrets before releasing; otherwise Gmail cannot connect." >&2
+            exit 1
+          fi
+
       - name: Install
         run: pnpm install --frozen-lockfile
 
@@ -105,33 +204,81 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Bridge and data regression tests
+        shell: bash
+        run: |
+          pnpm --filter @chai/db test
+          pnpm --filter @chai/agent-bridge test
+          pnpm --filter @chai/connectors-whatsapp test
+          pnpm test:migrations
+          pnpm verify:data-paths
+
       - name: Build + publish Windows release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CHAI_RELEASE: '1'
           CHAI_PUBLISH: '1'
-          # macOS job is authoritative for latest.json; Windows just adds
-          # the .exe to the same draft release.
+          # macOS owns the shared custom feed; Windows uploads its own
+          # electron-updater latest.yml and installers to the same draft.
           CHAI_SKIP_LATEST_JSON: '1'
-          CHAI_RELEASE_CHANNEL: ${{ inputs.channel || 'beta' }}
-          MIN_SUPPORTED_VERSION: ${{ inputs.min_supported_version }}
+          CHAI_RELEASE_CHANNEL: ${{ needs.prepare.outputs.channel }}
+          MIN_SUPPORTED_VERSION: ${{ needs.prepare.outputs.min_supported_version }}
         run: pnpm --filter chai release
 
-  notify:
-    needs: [release, release-windows]
+  verify:
+    needs: [prepare, release, release-windows]
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - name: Result
+      - name: Check platform results
+        env:
+          PREPARE_RESULT: ${{ needs.prepare.result }}
+          MAC_RESULT: ${{ needs.release.result }}
+          WINDOWS_RESULT: ${{ needs.release-windows.result }}
         run: |
-          mac="${{ needs.release.result }}"
-          win="${{ needs.release-windows.result }}"
-          echo "macOS:   $mac"
-          echo "Windows: $win"
-          if [ "$mac" = "success" ] && [ "$win" = "success" ]; then
-            echo "Both platform builds succeeded. The draft release is on GitHub Releases."
-            echo "Reminder: drafts are not visible to installed clients until you publish them."
-          else
-            echo "At least one platform build did not succeed."
-            exit 1
-          fi
+          echo "Prepare: $PREPARE_RESULT; macOS: $MAC_RESULT; Windows: $WINDOWS_RESULT"
+          test "$PREPARE_RESULT" = success
+          test "$MAC_RESULT" = success
+          test "$WINDOWS_RESULT" = success
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify draft assets and update feed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+          MIN_SUPPORTED_VERSION: ${{ needs.prepare.outputs.min_supported_version }}
+          CHAI_RELEASE_CHANNEL: ${{ needs.prepare.outputs.channel }}
+        run: |
+          gh release view "$RELEASE_TAG" --json tagName,isDraft,assets > release.json
+          gh release download "$RELEASE_TAG" --pattern latest.json
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          const release = JSON.parse(readFileSync('release.json', 'utf8'));
+          const latest = JSON.parse(readFileSync('latest.json', 'utf8'));
+          const version = process.env.RELEASE_VERSION;
+          const tag = process.env.RELEASE_TAG;
+          assert(release.isDraft, 'Builds must remain a draft until reviewed and published');
+          assert.equal(release.tagName, tag);
+          const assets = new Map(release.assets.map(asset => [asset.name, asset]));
+          for (const name of [
+            `Chai-${version}-arm64.dmg`, `Chai-${version}.dmg`,
+            `Chai-${version}-arm64-mac.zip`, `Chai-${version}-mac.zip`,
+            `Chai-Setup-${version}.exe`, 'latest-mac.yml', 'latest.yml', 'latest.json',
+          ]) {
+            assert(assets.get(name)?.size > 0, `Release asset missing or empty: ${name}`);
+          }
+          assert.equal(latest.latestVersion, version);
+          assert.equal(latest.minSupportedVersion, process.env.MIN_SUPPORTED_VERSION);
+          assert.equal(latest.channel, process.env.CHAI_RELEASE_CHANNEL);
+          const releaseUrl = `https://github.com/${process.env.GH_REPO}/releases/tag/${tag}`;
+          assert.equal(latest.downloadUrl, releaseUrl);
+          assert.equal(latest.releaseNotesUrl, releaseUrl);
+          assert(Number.isFinite(Date.parse(latest.releasedAt)), 'Release timestamp is invalid');
+          console.log(`Verified ${tag}: both Mac architectures, Windows installer, updater feeds, and latest.json. Draft is ready for review and publication.`);
+          NODE

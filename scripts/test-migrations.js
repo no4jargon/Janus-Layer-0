@@ -54,6 +54,9 @@ const expectedTables = [
   'clusters',
   'cluster_members',
   'ai_outputs',
+  'agent_bridge_audit_events',
+  'agent_response_watches',
+  'agent_response_tasks',
 ];
 
 const tableSet = (db) =>

@@ -107,6 +107,7 @@ type WaEvent =
   | { type: 'qr'; payload: { qr: string } }
   | { type: 'connection'; payload: { connection: string; statusCode?: number } }
   | { type: 'pairing-failed'; payload: { reason: string } }
+  | { type: 'chat-update'; payload: { remoteJid: string } }
   | { type: 'message-upsert'; payload: { remoteJid: string } }
   | { type: 'message-update'; payload: { remoteJid: string } }
   | { type: 'history-loaded'; payload: { chats: number; messages: number } };
@@ -134,6 +135,28 @@ type ClusterRecord = {
 type ClusterMemberInput = {
   source: 'gmail' | 'whatsapp';
   sourceRef: string;
+};
+
+type AgentBridgeStatus = {
+  enabled: boolean;
+  running: boolean;
+  host: string | null;
+  port: number | null;
+  rpcUrl: string | null;
+  mcpUrl: string | null;
+  tokenPath: string | null;
+  scopes: string[];
+};
+
+type AgentBridgeAuditEvent = {
+  id: string;
+  requestId: string | null;
+  agentId: string;
+  action: string;
+  target: string | null;
+  status: 'ok' | 'error' | 'blocked';
+  metadata: Record<string, unknown> | null;
+  createdAt: number;
 };
 
 declare global {
@@ -228,6 +251,7 @@ declare global {
       whatsapp: {
         listChats: () => Promise<WaChatSummary[]>;
         getChat: (jid: string) => Promise<WaMessageSummary[]>;
+        markChatRead: (jid: string) => Promise<{ ok: boolean }>;
         sendText: (payload: {
           jid: string;
           text: string;
@@ -242,6 +266,10 @@ declare global {
           reconnectCount: number;
           loggedOut: boolean;
         } | null>;
+      };
+      agentBridge: {
+        status: () => Promise<AgentBridgeStatus>;
+        audit: (input?: { limit?: number }) => Promise<AgentBridgeAuditEvent[]>;
       };
       cluster: {
         list: () => Promise<{

@@ -76,6 +76,109 @@ describe('WhatsApp store', () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
+  const getChat = (jid: string = CHAT_JID) => {
+    const chat = store.getChats(50).find((item) => item.jid === jid);
+    assert.ok(chat, `chat ${jid} should exist`);
+    return chat;
+  };
+
+  it('persists provider unread counts without clearing them on metadata-only updates', () => {
+    store.upsertChat({
+      jid: CHAT_JID,
+      isGroup: true,
+      lastMessageTs: 1_700_000_000,
+      lastMessageText: 'first unread',
+      lastMessageType: 'conversation',
+      unread: 3,
+    });
+
+    assert.equal(getChat().unread, 3);
+
+    store.upsertChat({
+      jid: CHAT_JID,
+      isGroup: true,
+      lastMessageTs: 1_700_000_060,
+      lastMessageText: 'new preview, same unread state',
+      lastMessageType: 'conversation',
+    });
+
+    const updated = getChat();
+    assert.equal(updated.lastMessageText, 'new preview, same unread state');
+    assert.equal(updated.unread, 3);
+
+    store.upsertChat({
+      jid: CHAT_JID,
+      unread: 0,
+    });
+
+    assert.equal(getChat().unread, 0);
+  });
+
+  it('increments, clears, and marks local WhatsApp unread counts', () => {
+    store.incrementChatUnread(CHAT_JID, 1);
+    store.incrementChatUnread(CHAT_JID, 2);
+
+    assert.equal(getChat().unread, 3);
+
+    store.markChatRead(CHAT_JID);
+    assert.equal(getChat().unread, 0);
+
+    store.markChatUnread(CHAT_JID);
+    assert.equal(getChat().unread, 1);
+
+    store.markChatUnread(CHAT_JID);
+    assert.equal(getChat().unread, 1);
+  });
+
+  it('preserves message previews on same-timestamp metadata updates, while accepting explicit empty text', () => {
+    store.upsertChat({
+      jid: CHAT_JID,
+      lastMessageTs: 1_700_000_000,
+      lastMessageText: 'keep this preview',
+      lastMessageType: 'conversation',
+      unread: 2,
+    });
+
+    store.upsertChat({ jid: CHAT_JID, name: 'Renamed', lastMessageTs: 1_700_000_000 });
+    assert.equal(getChat().lastMessageText, 'keep this preview');
+    assert.equal(getChat().lastMessageType, 'conversation');
+    assert.equal(getChat().unread, 2);
+
+    store.upsertChat({ jid: CHAT_JID, lastMessageTs: 1_700_000_060, unread: 3 });
+    assert.equal(getChat().lastMessageText, 'keep this preview');
+    assert.equal(getChat().lastMessageType, 'conversation');
+    assert.equal(getChat().unread, 3);
+
+    store.upsertChat({
+      jid: CHAT_JID,
+      lastMessageTs: 1_700_000_060,
+      lastMessageText: '',
+      lastMessageType: '',
+    });
+    assert.equal(getChat().lastMessageText, '');
+    assert.equal(getChat().lastMessageType, '');
+  });
+
+  it('does not count stored history messages as unread by itself', () => {
+    store.upsertMessage(
+      baseMessage({
+        messageKey: mkMessageKey({
+          remoteJid: CHAT_JID,
+          id: 'HISTORY_MESSAGE_001',
+          fromMe: false,
+          participant: PARENT_SENDER_JID,
+        }),
+        keyId: 'HISTORY_MESSAGE_001',
+        participant: PARENT_SENDER_JID,
+        senderJid: PARENT_SENDER_JID,
+        messageTimestamp: 1_700_000_000,
+        text: 'old synced message',
+      }),
+    );
+
+    assert.equal(getChat().unread, 0);
+  });
+
   it('persists reply context on insert and surfaces parent text via the join', () => {
     const parentKeyId = 'PARENT_STANZA_ID_001';
     const replyKeyId = 'REPLY_STANZA_ID_002';
@@ -181,9 +284,10 @@ describe('WhatsApp store', () => {
     assert.equal(store.resolveDisplayName(LID_SENDER_JID), 'Shilpi Shah');
   });
 
-  it('uses mapped contact names for direct chat titles', () => {
+  it('prefers mapped contact names over chat titles for direct chats', () => {
     store.upsertChat({
       jid: LID_SENDER_JID,
+      name: '+91 5551110000',
       isGroup: false,
       lastMessageTs: 1_700_000_180,
       lastMessageText: 'see you then',

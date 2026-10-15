@@ -93,6 +93,7 @@ apps/desktop
 packages/ui
 packages/core
 packages/db
+packages/agent-bridge
 packages/connectors-gmail
 packages/connectors-whatsapp
 packages/ai
@@ -111,6 +112,17 @@ Store locally:
 - settings
 - sync state
 - diagnostics metadata
+- local agent bridge audit events and response tasks
+
+### Trusted local agents
+
+The desktop starts a bearer-authenticated bridge on a loopback IP only. It offers
+MCP Streamable HTTP and JSON RPC over the same local runtime and SQLite stores.
+Only agents explicitly trusted by the user should receive the token: it grants
+message reading/sending and access to user-selected context files. Response
+watches create durable tasks for an external agent; Chai does not run an agent
+or send automatic replies on its own. Closing the workspace window keeps the
+bridge alive; quitting Chai stops it without deleting paired sessions.
 
 ## 7. Dev vs prod model
 
@@ -332,5 +344,6 @@ Build order:
 - Prefer startup migrations over installer-time migrations.
 - Keep user data local.
 - Treat WhatsApp support as best-effort and build recovery flows accordingly.
+- Generate WhatsApp pairing QR codes on-device; do not send pairing material to hosted QR services.
 - Add required update enforcement only after updater reliability is proven.
 - When the new repo exists, move this plan there and keep it updated.

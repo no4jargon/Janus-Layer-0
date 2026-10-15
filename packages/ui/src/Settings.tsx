@@ -3,6 +3,12 @@ import { useEffect, useState } from 'react';
 type Snapshot = Awaited<
   ReturnType<NonNullable<typeof window.chaiApi>['getRuntimeState']>
 >;
+type AgentBridgeStatusResult = Awaited<
+  ReturnType<NonNullable<typeof window.chaiApi>['agentBridge']['status']>
+>;
+type AgentBridgeAuditItem = Awaited<
+  ReturnType<NonNullable<typeof window.chaiApi>['agentBridge']['audit']>
+>[number];
 
 type Props = {
   snapshot: Snapshot;
@@ -28,10 +34,40 @@ export const SettingsModal = ({ snapshot, onClose }: Props) => {
   const [diagnosticsResult, setDiagnosticsResult] = useState<string | null>(null);
   const [updateBusy, setUpdateBusy] = useState(false);
   const [updateResult, setUpdateResult] = useState<string | null>(null);
+  const [agentBridgeStatus, setAgentBridgeStatus] =
+    useState<AgentBridgeStatusResult | null>(null);
+  const [agentBridgeAudit, setAgentBridgeAudit] = useState<
+    AgentBridgeAuditItem[]
+  >([]);
 
   useEffect(() => {
     setLlmModelPath(snapshot.settings.llmModelPath ?? '');
   }, [snapshot.settings.llmModelPath]);
+
+  useEffect(() => {
+    if (!window.chaiApi) return;
+    let cancelled = false;
+    const loadAgentBridge = async () => {
+      try {
+        const [status, audit] = await Promise.all([
+          window.chaiApi?.agentBridge.status(),
+          window.chaiApi?.agentBridge.audit({ limit: 8 }),
+        ]);
+        if (cancelled) return;
+        if (status) setAgentBridgeStatus(status);
+        if (audit) setAgentBridgeAudit(audit);
+      } catch {
+        if (!cancelled) {
+          setAgentBridgeStatus(null);
+          setAgentBridgeAudit([]);
+        }
+      }
+    };
+    void loadAgentBridge();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const cycleTheme = async () => {
     if (!window.chaiApi) return;
@@ -204,6 +240,45 @@ export const SettingsModal = ({ snapshot, onClose }: Props) => {
           </section>
 
           <section className="settings-section">
+            <h4>Local agent bridge</h4>
+            <ul className="settings-list">
+              <li>
+                <strong>Status:</strong>{' '}
+                {agentBridgeStatus?.running ? 'Running' : 'Stopped'}
+              </li>
+              <li>
+                <strong>MCP endpoint:</strong>{' '}
+                <code className="path">{agentBridgeStatus?.mcpUrl ?? 'Unavailable'}</code>
+              </li>
+              <li>
+                <strong>RPC endpoint:</strong>{' '}
+                <code className="path">{agentBridgeStatus?.rpcUrl ?? 'Unavailable'}</code>
+              </li>
+              <li>
+                <strong>Token file:</strong>{' '}
+                <code className="path">{agentBridgeStatus?.tokenPath ?? 'Unavailable'}</code>
+              </li>
+              <li>
+                <strong>Scopes:</strong>{' '}
+                {(agentBridgeStatus?.scopes ?? []).join(', ') || 'None'}
+              </li>
+            </ul>
+            {agentBridgeAudit.length ? (
+              <ul className="settings-list">
+                {agentBridgeAudit.map((event) => (
+                  <li key={event.id}>
+                    <strong>{event.status}</strong> · {event.action}
+                    {event.target ? ` · ${event.target}` : ''} ·{' '}
+                    {new Date(event.createdAt).toLocaleTimeString()}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="settings-hint">No local agent activity yet.</p>
+            )}
+          </section>
+
+          <section className="settings-section">
             <h4>Storage</h4>
             <ul className="settings-list">
               <li>
@@ -274,4 +349,3 @@ export const SettingsModal = ({ snapshot, onClose }: Props) => {
     </div>
   );
 };
-

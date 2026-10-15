@@ -1255,8 +1255,8 @@ body {
 	cursor: not-allowed;
 }
 
-/* QR area image (we render an inline image from the QR string) */
-.qr img { max-width: 180px; display: block; margin-top: 6px; }
+/* Pairing QR is generated locally without a remote image request. */
+.qr svg { max-width: 180px; height: auto; display: block; margin-top: 6px; }
 
 /* settings + onboarding modals */
 .settings-card {

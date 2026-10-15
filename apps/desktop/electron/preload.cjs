@@ -30,9 +30,16 @@ contextBridge.exposeInMainWorld('chaiApi', {
   whatsapp: {
     listChats: () => ipcRenderer.invoke('chai:whatsapp:list-chats'),
     getChat: (jid) => ipcRenderer.invoke('chai:whatsapp:get-chat', jid),
+    markChatRead: (jid) =>
+      ipcRenderer.invoke('chai:whatsapp:mark-chat-read', jid),
     sendText: (payload) =>
       ipcRenderer.invoke('chai:whatsapp:send', payload),
     getStatus: () => ipcRenderer.invoke('chai:whatsapp:status'),
+  },
+
+  agentBridge: {
+    status: () => ipcRenderer.invoke('chai:agent-bridge:status'),
+    audit: (input) => ipcRenderer.invoke('chai:agent-bridge:audit', input),
   },
 
   cluster: {

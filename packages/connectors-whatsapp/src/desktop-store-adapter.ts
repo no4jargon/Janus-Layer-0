@@ -18,6 +18,18 @@ export const createDesktopBaileysSessionAdapter = (
   upsertChat: (input) => {
     store.upsertChat(input);
   },
+  setChatUnread: (jid, unread) => {
+    store.setChatUnread(jid, unread);
+  },
+  incrementChatUnread: (jid, delta) => {
+    store.incrementChatUnread(jid, delta);
+  },
+  markChatRead: (jid) => {
+    store.markChatRead(jid);
+  },
+  markChatUnread: (jid) => {
+    store.markChatUnread(jid);
+  },
   upsertMessage: (input) => {
     store.upsertMessage(input);
   },

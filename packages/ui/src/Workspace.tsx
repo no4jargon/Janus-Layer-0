@@ -6,6 +6,7 @@ import {
   useState,
   type CSSProperties,
 } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { AiPanel } from './AiPanel';
 import { SettingsModal } from './Settings';
 import { OptionalUpdateBanner, PrivacyBanner } from './UpdateScreens';
@@ -254,6 +255,8 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
   const [moreChannelsOpen, setMoreChannelsOpen] = useState(false);
   const [comingSoonText, setComingSoonText] = useState<string | null>(null);
   const [waConnectionText, setWaConnectionText] = useState('Connecting…');
+  const [waConnected, setWaConnected] = useState(false);
+  const waStatusVersionRef = useRef(0);
   const [waQr, setWaQr] = useState<string | null>(null);
   const [waSendingStatus, setWaSendingStatus] = useState<ComposerStatus>({
     text: 'Select a WhatsApp conversation to send.',
@@ -356,6 +359,7 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
   // Mirror WhatsApp connection text from snapshot
   useEffect(() => {
     const status = connectorSummary.whatsappStatus;
+    setWaConnected(status === 'connected' || status === 'syncing');
     if (status === 'connected' || status === 'syncing') setWaConnectionText('WhatsApp connected');
     else if (status === 'connecting') setWaConnectionText('Connecting…');
     else if (status === 'error') setWaConnectionText('Connection error');
@@ -373,6 +377,28 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
     if (!window.chaiApi) return;
     const chats = await window.chaiApi.whatsapp.listChats();
     setWhatsappChats(chats.map(toListItemWhatsapp));
+  }, []);
+
+  // Socket events can arrive while this window is closed. Recover the current
+  // connection and pairing QR when mounting instead of waiting for a new event.
+  useEffect(() => {
+    if (!window.chaiApi) return;
+    let mounted = true;
+    const requestedVersion = waStatusVersionRef.current;
+    void window.chaiApi.whatsapp.getStatus().then((status) => {
+      if (!mounted || !status || requestedVersion !== waStatusVersionRef.current) return;
+      setWaConnected(status.connected);
+      setWaQr(status.lastQr);
+      sawWaQrRef.current = Boolean(status.lastQr);
+      if (status.connected) setWaConnectionText('WhatsApp connected');
+      else if (status.loggedOut) setWaConnectionText('Logged out. Reset to re-pair.');
+      else if (status.lastQr) setWaConnectionText('Scan QR to login');
+      else if (status.reconnectCount > 0) setWaConnectionText('Disconnected. Reconnecting…');
+      else setWaConnectionText('WhatsApp disconnected');
+    }).catch(() => {
+      // Runtime snapshot and live events continue to report connector state.
+    });
+    return () => { mounted = false; };
   }, []);
 
   const loadEmailThreads = useCallback(async () => {
@@ -402,6 +428,15 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
     );
   }, []);
 
+  const markWhatsappChatRead = useCallback(
+    async (jid: string) => {
+      if (!window.chaiApi) return;
+      await window.chaiApi.whatsapp.markChatRead(jid);
+      await loadWhatsappChats();
+    },
+    [loadWhatsappChats],
+  );
+
   const loadEmailThread = useCallback(async (threadId: string) => {
     if (!window.chaiApi) return;
     const payload = await window.chaiApi.gmail.getThread(threadId);
@@ -429,11 +464,12 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
       setSelectedMessageKeys(new Set());
       if (item.sourceType === 'whatsapp_chat') {
         await loadWhatsappThread(item.id);
+        await markWhatsappChatRead(item.id);
       } else {
         await loadEmailThread(item.id);
       }
     },
-    [loadEmailThread, loadWhatsappThread],
+    [loadEmailThread, loadWhatsappThread, markWhatsappChatRead],
   );
 
   // Initial load
@@ -497,11 +533,16 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
   // Subscribe to WhatsApp events for live updates
   const onWaEvent = useCallback(
     (event: Parameters<NonNullable<typeof window.chaiApi>['events']['onWhatsAppEvent']>[0] extends (e: infer T) => void ? T : never) => {
+      if (event.type === 'qr' || event.type === 'connection' || event.type === 'pairing-failed') {
+        waStatusVersionRef.current += 1;
+      }
       if (event.type === 'qr') {
+        setWaConnected(false);
         setWaQr(event.payload.qr);
         setWaConnectionText('Scan QR to login');
         sawWaQrRef.current = true;
       } else if (event.type === 'connection' && event.payload.connection === 'open') {
+        setWaConnected(true);
         setWaQr(null);
         setWaConnectionText('WhatsApp connected');
         if (sawWaQrRef.current) {
@@ -509,26 +550,37 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
           setConnectOverlay('whatsapp');
         }
       } else if (event.type === 'connection' && event.payload.connection === 'close') {
+        setWaConnected(false);
         setWaConnectionText('Disconnected. Reconnecting…');
       } else if (event.type === 'pairing-failed') {
+        setWaConnected(false);
         setWaQr(null);
         setWaConnectionText('Logged out. Reset to re-pair.');
       } else if (
+        event.type === 'chat-update' ||
         event.type === 'message-upsert' ||
         event.type === 'message-update'
       ) {
-        void loadWhatsappChats();
-        if (
-          activeThread?.sourceType === 'whatsapp_chat' &&
-          event.payload.remoteJid === activeThread.id
-        ) {
-          void loadWhatsappThread(activeThread.id);
-        }
+        void (async () => {
+          await loadWhatsappChats();
+          if (
+            activeThread?.sourceType === 'whatsapp_chat' &&
+            event.payload.remoteJid === activeThread.id
+          ) {
+            await loadWhatsappThread(activeThread.id);
+            if (
+              event.type === 'chat-update' ||
+              event.type === 'message-upsert'
+            ) {
+              await markWhatsappChatRead(activeThread.id);
+            }
+          }
+        })();
       } else if (event.type === 'history-loaded') {
         void loadWhatsappChats();
       }
     },
-    [activeThread, loadWhatsappChats, loadWhatsappThread],
+    [activeThread, loadWhatsappChats, loadWhatsappThread, markWhatsappChatRead],
   );
   useWhatsAppEvents(onWaEvent);
 
@@ -1242,8 +1294,7 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
 
         {activeTab === 'whatsapp' ? (
           <div className="email-toolbar">
-            {connectorSummary.whatsappStatus === 'connected' ||
-            connectorSummary.whatsappStatus === 'syncing' ? (
+            {waConnected ? (
               <button onClick={() => void onDisconnectWhatsapp()}>
                 Disconnect
               </button>
@@ -1277,9 +1328,13 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
         {activeTab === 'whatsapp' && waQr ? (
           <div className="qr">
             <div>Scan with phone:</div>
-            <img
-              alt="WhatsApp QR"
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(waQr)}`}
+            <QRCodeSVG
+              value={waQr}
+              size={180}
+              marginSize={4}
+              role="img"
+              aria-label="WhatsApp QR"
+              title="WhatsApp QR"
             />
           </div>
         ) : null}

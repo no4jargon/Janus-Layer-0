@@ -50,6 +50,10 @@ export interface BaileysSessionAdapter {
   ): void | Promise<void>;
   upsertContact(input: WaContactUpsert): void | Promise<void>;
   upsertChat(input: WaChatUpsert): void | Promise<void>;
+  setChatUnread(jid: string, unread: number): void | Promise<void>;
+  incrementChatUnread(jid: string, delta: number): void | Promise<void>;
+  markChatRead(jid: string): void | Promise<void>;
+  markChatUnread(jid: string): void | Promise<void>;
   upsertMessage(input: WaMessageRecord): void | Promise<void>;
   getMessage(
     messageKey: string,

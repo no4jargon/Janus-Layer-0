@@ -8,7 +8,7 @@ Goal: every test below should be exercised on at least one macOS install **and**
 
 - Tester downloads the platform installer (`.dmg` for macOS, `.exe` for Windows) from the private beta channel.
 - Tester is on a network with outbound HTTPS (Google OAuth + Baileys + Ollama).
-- A local Ollama instance is running (`ollama run llama3:8b`) if AI is being tested.
+- Allow the local Gemma 3 4B model to download on first launch, or configure an existing GGUF model in Settings.
 
 ## 1. Install & first run
 
@@ -38,6 +38,7 @@ Goal: every test below should be exercised on at least one macOS install **and**
 | # | Step | Expected |
 |---|---|---|
 | 2.8 | Switch to WhatsApp tab → click **Connect WhatsApp** | Sidebar shows QR image |
+| 2.8a | Inspect the pairing QR and renderer network requests | QR is an inline SVG with accessible label "WhatsApp QR"; no pairing payload is sent to an external QR/image service |
 | 2.9 | Scan QR with phone (Linked Devices) | QR disappears; "WhatsApp connected" line; chats begin appearing |
 | 2.10 | Wait 1 minute on a quiet account | Sidebar shows synced chats with last-message text + relative timestamp |
 | 2.11 | Open a chat → send "QA test" | Message appears in thread on this device and on the phone |
@@ -71,10 +72,18 @@ Goal: every test below should be exercised on at least one macOS install **and**
 | # | Step | Expected |
 |---|---|---|
 | 5.1 | Open Settings → cycle Theme | Cycles through `system → dark → light → system` |
-| 5.2 | Set Ollama Base URL `http://invalid:1` and run AI extraction | Status shows fetch error; URL persisted across restart |
-| 5.3 | Clear Ollama overrides (leave blank) → save | Defaults back to `http://127.0.0.1:11434` / `llama3:8b` |
+| 5.2 | Set a nonexistent GGUF model path and run AI extraction | A readable model-file error is shown; path persists across restart |
+| 5.3 | Clear the GGUF model override → save | Defaults back to the bundled Gemma 3 4B model download/cache |
 | 5.4 | Click **Export diagnostics** | Save dialog → JSON file written with `app`, `paths`, `schemaMigrations`, `connectors`, `logTail`, `backups` keys |
 | 5.5 | Open the exported JSON in a text editor | No tokens, no message bodies present |
+| 5.6 | Open Settings → Local agent bridge | MCP/RPC URLs show `127.0.0.1:43124`; token-file path is visible; recent audit list is present |
+| 5.7 | With Chai running, call `GET /health` on the bridge | JSON response identifies `chai-agent-bridge`; no message data is returned |
+| 5.8 | Call an MCP `tools/list` request with bearer token from the token file | Tools include `resolve_person`, `read_conversation`, `send_message`, and response-watch tools |
+| 5.9 | Omit the bearer token; then try a foreign Origin or Host with authentication | Missing authentication returns 401; foreign Origin/Host returns 403 |
+| 5.10 | Close the workspace window; query bridge health; reopen Chai | Bridge stays healthy; the window reopens with current WhatsApp connection/QR state |
+| 5.11 | Quit Chai, then relaunch | Port closes on quit; bridge restarts using the same private token and preserved account sessions |
+| 5.12 | Create a response watch, restart, then pause/resume it | Instructions and pending tasks survive; paused watches create no new tasks; resuming discovers backlog |
+| 5.13 | Repeat a confirmed send with its original request ID/content; then reuse the ID with changed content | First retry reuses the original outbox result; changed content is blocked before dispatch |
 
 ## 6. Updates
 

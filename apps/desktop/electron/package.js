@@ -11,6 +11,45 @@ const isPublish = process.env.CHAI_PUBLISH === '1';
 // In multi-platform CI, only one job (the macOS one) should write
 // latest.json. Other platform jobs set this to skip the write+upload.
 const skipLatestJson = process.env.CHAI_SKIP_LATEST_JSON === '1';
+const pkg = JSON.parse(
+  readFileSync(path.join(desktopRoot, 'package.json'), 'utf8'),
+);
+const version = pkg.version;
+const tag = `v${version}`;
+const minSupported = process.env.MIN_SUPPORTED_VERSION || version;
+const channel = process.env.CHAI_RELEASE_CHANNEL || 'beta';
+const { owner, repo } = pkg.build.publish;
+const repoSlug = `${owner}/${repo}`;
+
+if (isPublish && !isRelease) {
+  throw new Error('CHAI_PUBLISH=1 requires CHAI_RELEASE=1');
+}
+
+if (isRelease) {
+  const validVersion = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+  if (!validVersion.test(version) || !validVersion.test(minSupported)) {
+    throw new Error('Release and minimum supported versions must use major.minor.patch');
+  }
+  const left = minSupported.split('.').map(Number);
+  const right = version.split('.').map(Number);
+  const firstDifference = left.findIndex((part, index) => part !== right[index]);
+  if (firstDifference >= 0 && left[firstDifference] > right[firstDifference]) {
+    throw new Error('MIN_SUPPORTED_VERSION cannot exceed the release version');
+  }
+  if (!['beta', 'stable'].includes(channel)) {
+    throw new Error('CHAI_RELEASE_CHANNEL must be beta or stable');
+  }
+  if (process.env.GITHUB_REF_TYPE === 'tag' && process.env.GITHUB_REF_NAME !== tag) {
+    throw new Error(`Release tag must match desktop package version (${tag})`);
+  }
+}
+
+if (isPublish && !skipLatestJson) {
+  const gh = spawnSync('gh', ['--version'], { stdio: 'ignore' });
+  if (gh.error || gh.status !== 0) {
+    throw new Error('Publishing latest.json requires the gh CLI; install it before building');
+  }
+}
 
 execSync('node ./electron/build.js', {
   cwd: desktopRoot,
@@ -40,15 +79,6 @@ execSync(`electron-builder ${flags.join(' ')}`.trim(), {
 });
 
 if (isRelease && !skipLatestJson) {
-  const pkg = JSON.parse(
-    readFileSync(path.join(desktopRoot, 'package.json'), 'utf8'),
-  );
-  const version = pkg.version;
-  const tag = `v${version}`;
-  const minSupported = process.env.MIN_SUPPORTED_VERSION || version;
-  const channel = process.env.CHAI_RELEASE_CHANNEL || 'beta';
-  const repoSlug = 'no4jargon/Janus-Layer-0';
-
   const latest = {
     latestVersion: version,
     minSupportedVersion: minSupported,
@@ -69,18 +99,13 @@ if (isRelease && !skipLatestJson) {
   if (isPublish) {
     const upload = spawnSync(
       'gh',
-      ['release', 'upload', tag, latestPath, '--clobber'],
+      ['release', 'upload', tag, latestPath, '--repo', repoSlug, '--clobber'],
       { cwd: desktopRoot, stdio: 'inherit' },
     );
     if (upload.error || upload.status !== 0) {
-      console.warn(
-        `\n[desktop] could not auto-upload latest.json (gh exit=${upload.status ?? 'missing'}).`,
-      );
-      console.warn(
-        `[desktop] run this manually once the GitHub release is published:`,
-      );
-      console.warn(
-        `[desktop]   gh release upload ${tag} ${latestPath} --clobber\n`,
+      throw new Error(
+        `latest.json upload failed (gh exit=${upload.status ?? 'missing'}). ` +
+        `Keep ${tag} as a draft and retry: gh release upload ${tag} "${latestPath}" --repo ${repoSlug} --clobber`,
       );
     } else {
       console.log(

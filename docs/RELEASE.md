@@ -1,6 +1,6 @@
 # Release & Update Guide
 
-This guide covers how to produce signed installers and publish updates that the in-app updater can consume.
+This guide covers the current unsigned beta installers, GitHub publishing, and the manual update feed. Signing remains optional future work.
 
 ## 1. Local unsigned build (default)
 
@@ -10,7 +10,7 @@ pnpm package:desktop
 
 Runs `electron-builder --dir` with `mac.identity=null` and `publish=null`. Produces an unsigned `.app` (mac) / unpacked `dir` build under `apps/desktop/dist/`. Use for smoke tests only — auto-update will not work.
 
-## 2. Signed beta release
+## 2. Beta installers and optional signing
 
 ```bash
 CHAI_RELEASE=1 pnpm package:desktop
@@ -18,7 +18,7 @@ CHAI_RELEASE=1 pnpm package:desktop
 pnpm --filter chai release
 ```
 
-This switches `electron-builder` to the production config in `apps/desktop/package.json`:
+This switches `electron-builder` to the installer config in `apps/desktop/package.json`. Builds are unsigned unless signing credentials are supplied:
 
 - mac: `dmg` + `zip` (arm64 + x64), hardened runtime, entitlements at `apps/desktop/build/entitlements.mac.plist`
 - win: `nsis` (x64), per-user installer with directory choice
@@ -51,7 +51,7 @@ For EV certs, follow electron-builder's docs on USB token signing.
 
 Update artifacts are hosted on **GitHub Releases** for this repo (`no4jargon/Janus-Layer-0`). There is no separate update server to operate.
 
-Two feeds are published per release; both are read by clients automatically with no env var configuration:
+Two feed formats are published per release. The custom JSON feed drives the current manual-update UI; the electron-updater feeds are retained for future in-app installation:
 
 | Feed | Format | Consumer | Purpose |
 |---|---|---|---|
@@ -75,7 +75,7 @@ CHAI_RELEASE=1 CHAI_PUBLISH=1 pnpm --filter chai release
 Under the hood:
 
 1. `electron-builder --publish=always` builds installers and uploads them + `latest-*.yml` to a draft GitHub release named `v<version>`. Requires `GH_TOKEN` (env var with `contents: write` scope) for publishing — `electron-builder` reads this env var directly and does **not** pick up `gh` CLI auth on its own, hence the `export GH_TOKEN=$(gh auth token)` line above.
-2. `apps/desktop/electron/package.js` then writes `dist/latest.json` and runs `gh release upload v<version> latest.json --clobber` to attach it to the same release. If the `gh` CLI isn't installed, the script prints the manual command to run.
+2. `apps/desktop/electron/package.js` writes `dist/latest.json` and uploads it to the explicit repository with `gh release upload`. A missing CLI or failed upload fails the release command; keep the release as a draft until fixed.
 3. The release is created as a **draft** by default — you must publish it on GitHub before clients can see it.
 
 Stable URLs once the release is published:
@@ -108,7 +108,7 @@ Use the opt-out path for cosmetic fixes, non-breaking features, or anything wher
 
 ### Required Update screen behavior
 
-The desktop app is currently distributed unsigned, so in-app auto-update is not available — Apple blocks unsigned binaries from replacing themselves on macOS. The Required Update screen and the optional banner therefore link directly to the GitHub release for manual download:
+The desktop app currently uses unsigned builds and manual updates. The Required Update screen and the optional banner link directly to the GitHub release for manual download:
 
 1. App starts, fetches `latest.json` on boot (`bootstrap` → `runUpdateCheck`).
 2. `decideUpdate` returns `kind: 'required'` because `currentVersion < minSupportedVersion`.
@@ -130,3 +130,33 @@ The plan calls for `dev` / `beta` / `stable` channels. For now the beta channel 
 - `mac.publish.channel` and `createUpdateChecker`'s `channel` option default to `beta`.
 - Override at release time with `CHAI_RELEASE_CHANNEL` (used by `latest.json` generation).
 - Don't move to `stable` until the updater has been exercised against real installs and the migration test harness has run cleanly across the previous N releases.
+
+## 7. Release checklist for v0.1.12 and later
+
+1. Bump only `apps/desktop/package.json`, add release notes under
+   `docs/releases/`, and commit the reviewed source plus lockfile.
+2. Run `pnpm build`, `pnpm typecheck`, package regression tests, Python
+   notification tests, `pnpm test:migrations`, and `pnpm verify:data-paths`.
+3. Build a local app with `pnpm package:desktop`; launch it and check bridge
+   health, authenticated MCP tools, window close/reopen, and clean quit/restart.
+   Keep existing user data and paired sessions.
+4. Configure repository secrets `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+   and `GOOGLE_REDIRECT_URI` from the existing desktop OAuth configuration.
+   The workflow requires the first two, embeds them in the desktop client,
+   and never prints their values. These are application OAuth settings, not
+   user tokens.
+5. Push `main` and a new `v<version>` tag. The Release workflow validates that
+   the tag matches the package, creates a draft, runs regressions on macOS and
+   Windows, builds both Mac architectures and Windows x64, and verifies all
+   installers plus `latest-mac.yml`, `latest.yml`, and `latest.json`.
+6. Wait for the `verify` job to pass. Add the exact release notes with
+   `gh release edit --notes-file`, then publish the draft. A beta-channel
+   release uses a normal GitHub release so `/releases/latest` remains visible
+   to the existing beta clients.
+7. Verify the public release assets and download `latest.json` from the actual
+   `/releases/latest/download/latest.json` URL. Confirm current clients are
+   up-to-date and prior versions receive the intended update decision.
+
+The workflow leaves successful builds as a draft. Publishing is the explicit
+final step after local and remote validation. Do not move an existing version
+tag or rebuild an already-published release with different source.

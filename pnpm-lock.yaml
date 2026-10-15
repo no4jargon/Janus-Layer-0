@@ -17,6 +17,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@chai/agent-bridge':
+        specifier: workspace:*
+        version: link:../../packages/agent-bridge
       '@chai/ai':
         specifier: workspace:*
         version: link:../../packages/ai
@@ -69,8 +72,8 @@ importers:
         specifier: 3.18.1
         version: 3.18.1
       baileys:
-        specifier: ^7.0.0-rc.9
-        version: 7.0.0-rc.9(sharp@0.34.5)
+        specifier: 7.0.0-rc12
+        version: 7.0.0-rc12(sharp@0.34.5)
       electron-updater:
         specifier: ^6.6.2
         version: 6.8.3
@@ -90,6 +93,19 @@ importers:
       vite:
         specifier: ^8.0.10
         version: 8.0.10(@types/node@25.6.0)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.21.0)
+
+  packages/agent-bridge:
+    dependencies:
+      '@chai/core':
+        specifier: workspace:*
+        version: link:../core
+      '@chai/db':
+        specifier: workspace:*
+        version: link:../db
+    devDependencies:
+      tsx:
+        specifier: ^4.20.3
+        version: 4.21.0
 
   packages/ai:
     dependencies:
@@ -133,11 +149,15 @@ importers:
         specifier: ^10.0.1
         version: 10.0.1
       baileys:
-        specifier: ^7.0.0-rc.9
-        version: 7.0.0-rc.9(sharp@0.34.5)
+        specifier: 7.0.0-rc12
+        version: 7.0.0-rc12(sharp@0.34.5)
       pino:
         specifier: ^9.13.1
         version: 9.14.0
+    devDependencies:
+      tsx:
+        specifier: ^4.20.3
+        version: 4.21.0
 
   packages/core:
     dependencies:
@@ -161,6 +181,9 @@ importers:
       '@chai/ai-prompts':
         specifier: workspace:*
         version: link:../ai-prompts
+      qrcode.react:
+        specifier: ^4.2.0
+        version: 4.2.0(react@19.2.5)
       react:
         specifier: ^19.2.5
         version: 19.2.5
@@ -1029,12 +1052,12 @@ packages:
     resolution: {integrity: sha512-kNOjDqAh7px0XWNI+4QbzoiR/nTkHAWNud2uvnJquD1/x5a7EQZMJT0AczqK0Qn67oY/TTQ1LbUKajZpp3I9tQ==}
     engines: {node: '>=8.0.0'}
 
-  baileys@7.0.0-rc.9:
-    resolution: {integrity: sha512-Txd2dZ9MHbojvsHckeuCnAKPO/bQjKxua/0tQSJwOKXffK5vpS82k4eA/Nb46K0cK0Bx+fyY0zhnQHYMBriQcw==}
+  baileys@7.0.0-rc12:
+    resolution: {integrity: sha512-kttfToIBUKJb5hn57GspFbtlGaOp8wwhij7F8JRtduIL6vIODL5ze7XnsQKT73QwgFOGdJYXAT01x6rz9NNijg==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       audio-decode: ^2.1.3
-      jimp: ^1.6.0
+      jimp: ^1.6.1
       link-preview-js: ^3.0.0
       sharp: '*'
     peerDependenciesMeta:
@@ -1645,9 +1668,8 @@ packages:
   lazy-val@1.0.5:
     resolution: {integrity: sha512-0/BnGCCfyUMkBpeDgWihanIAF9JmZhHBgUhEqzvf+adhNGLoP6TaiI5oF8oyb3I45P+PcnrqihSf01M0l0G5+Q==}
 
-  libsignal@https://codeload.github.com/whiskeysockets/libsignal-node/tar.gz/bcea72df9ec34d9d9140ab30619cf479c7c144c7:
-    resolution: {tarball: https://codeload.github.com/whiskeysockets/libsignal-node/tar.gz/bcea72df9ec34d9d9140ab30619cf479c7c144c7}
-    version: 6.0.0
+  libsignal@6.0.0:
+    resolution: {integrity: sha512-d/5V3YFtDljbFMufz4ncyUYGYhJl+vzAe+c2EFFBQ6bz1h8Q3IOMEGXYMzlibU60I+e8GagMMpji18iez3P1hA==}
 
   lifecycle-utils@2.1.0:
     resolution: {integrity: sha512-AnrXnE2/OF9PHCyFg0RSqsnQTzV991XaZA/buhFDoc58xU7rhSCDgCz/09Lqpsn4MpoPHt7TRAXV1kWZypFVsA==}
@@ -2023,6 +2045,11 @@ packages:
     resolution: {integrity: sha512-n7mar4T0xQ+39dE2vGTAlbxUEpndwPANH0kDef1/MYsB8Bba9wshkybIRx74qgcvKQPEWErf9AqAdYjhzY2Ilg==}
     engines: {node: '>=20'}
 
+  qrcode.react@4.2.0:
+    resolution: {integrity: sha512-QpgqWi8rD9DsS9EP3z7BT+5lY5SFhsqGjpgW5DY/i3mK4M9DTBNz3ErMi8BWYEfI3L0d8GIbGmcdFAS1uIRGjA==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
   quick-format-unescaped@4.0.4:
     resolution: {integrity: sha512-tYC1Q1hgyRuHgloV/YXs2w15unPVh8qfu/qCTfhTYamaw7fyhumKa2yGpdSo87vY32rIclj+4fWYQXUMs9EHvg==}
 
@@ -2385,6 +2412,9 @@ packages:
         optional: true
       yaml:
         optional: true
+
+  whatsapp-rust-bridge@0.5.4:
+    resolution: {integrity: sha512-yYO1qSs0Fe7tGtnxOFHomocUD6IZtoAgmA4oDFyGIRZ67D3QZk3w7swA6XXFXNQngiyrg2k7tul6IrM3eUFh7A==}
 
   which@2.0.2:
     resolution: {integrity: sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA==}
@@ -3161,18 +3191,19 @@ snapshots:
 
   atomic-sleep@1.0.0: {}
 
-  baileys@7.0.0-rc.9(sharp@0.34.5):
+  baileys@7.0.0-rc12(sharp@0.34.5):
     dependencies:
       '@cacheable/node-cache': 1.7.6
       '@hapi/boom': 9.1.4
       async-mutex: 0.5.0
-      libsignal: https://codeload.github.com/whiskeysockets/libsignal-node/tar.gz/bcea72df9ec34d9d9140ab30619cf479c7c144c7
+      libsignal: 6.0.0
       lru-cache: 11.3.5
       music-metadata: 11.12.3
       p-queue: 9.2.0
       pino: 9.14.0
       protobufjs: 7.5.6
       sharp: 0.34.5
+      whatsapp-rust-bridge: 0.5.4
       ws: 8.20.0
     transitivePeerDependencies:
       - bufferutil
@@ -3910,7 +3941,7 @@ snapshots:
 
   lazy-val@1.0.5: {}
 
-  libsignal@https://codeload.github.com/whiskeysockets/libsignal-node/tar.gz/bcea72df9ec34d9d9140ab30619cf479c7c144c7:
+  libsignal@6.0.0:
     dependencies:
       curve25519-js: 0.0.4
       protobufjs: 7.5.6
@@ -4299,6 +4330,10 @@ snapshots:
     dependencies:
       hookified: 2.2.0
 
+  qrcode.react@4.2.0(react@19.2.5):
+    dependencies:
+      react: 19.2.5
+
   quick-format-unescaped@4.0.4: {}
 
   quick-lru@5.1.1: {}
@@ -4664,6 +4699,8 @@ snapshots:
       fsevents: 2.3.3
       jiti: 2.6.1
       tsx: 4.21.0
+
+  whatsapp-rust-bridge@0.5.4: {}
 
   which@2.0.2:
     dependencies:

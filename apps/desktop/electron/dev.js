@@ -15,6 +15,7 @@ const buildPackages = () => {
     '@chai/shared',
     '@chai/db',
     '@chai/core',
+    '@chai/agent-bridge',
     '@chai/ai-prompts',
     '@chai/ai',
     '@chai/connectors-gmail',

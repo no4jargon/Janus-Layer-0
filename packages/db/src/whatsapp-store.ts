@@ -10,11 +10,40 @@ import type {
 
 const num = (value: unknown): number => Number(value ?? 0);
 
+const unreadCount = (value: unknown): number | null => {
+  if (value === null || value === undefined) return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(0, Math.trunc(parsed));
+};
+
 const trimmedOrNull = (value: unknown): string | null => {
   if (typeof value !== 'string') return null;
   const v = value.trim();
   return v.length ? v : null;
 };
+
+const contactDisplayNameSql = () => `
+  COALESCE(
+    NULLIF(TRIM(ct.name), ''),
+    NULLIF(TRIM(ct.notify), ''),
+    NULLIF(TRIM(ct.verified_name), ''),
+    NULLIF(TRIM(ct.username), ''),
+    NULLIF(TRIM(mapped_ct.name), ''),
+    NULLIF(TRIM(mapped_ct.notify), ''),
+    NULLIF(TRIM(mapped_ct.verified_name), ''),
+    NULLIF(TRIM(mapped_ct.username), '')
+  )
+`;
+
+const contactLookupJoinsSql = (jidSql: string) => `
+  LEFT JOIN wa_contacts ct ON ct.jid = ${jidSql}
+  LEFT JOIN wa_contacts mapped_ct
+    ON mapped_ct.jid = COALESCE(
+      (SELECT target_jid FROM wa_jid_map WHERE source_jid = ${jidSql} LIMIT 1),
+      (SELECT source_jid FROM wa_jid_map WHERE target_jid = ${jidSql} LIMIT 1)
+    )
+`;
 
 export const mkMessageKey = (key: {
   remoteJid?: string | null;
@@ -104,18 +133,24 @@ export const createWhatsAppStore = (db: Database) => {
 
   const upsertChatStmt = db.prepare(`
     INSERT INTO wa_chats (jid, name, is_group, last_message_ts, last_message_text, last_message_type, unread, updated_at)
-    VALUES (@jid, @name, @isGroup, @lastMessageTs, @lastMessageText, @lastMessageType, @unread, @updatedAt)
+    VALUES (@jid, @name, @isGroup, @lastMessageTs, @lastMessageText, @lastMessageType, COALESCE(@unread, 0), @updatedAt)
     ON CONFLICT(jid) DO UPDATE SET
       name = COALESCE(NULLIF(TRIM(excluded.name), ''), wa_chats.name),
       is_group = CASE WHEN wa_chats.is_group = 1 THEN 1 ELSE excluded.is_group END,
       last_message_ts = MAX(wa_chats.last_message_ts, excluded.last_message_ts),
       last_message_text = CASE
-        WHEN excluded.last_message_ts >= wa_chats.last_message_ts THEN excluded.last_message_text
+        WHEN @hasLastMessageText = 1 AND excluded.last_message_ts >= wa_chats.last_message_ts
+          THEN excluded.last_message_text
         ELSE wa_chats.last_message_text
       END,
       last_message_type = CASE
-        WHEN excluded.last_message_ts >= wa_chats.last_message_ts THEN excluded.last_message_type
+        WHEN @hasLastMessageType = 1 AND excluded.last_message_ts >= wa_chats.last_message_ts
+          THEN excluded.last_message_type
         ELSE wa_chats.last_message_type
+      END,
+      unread = CASE
+        WHEN @unread IS NULL THEN wa_chats.unread
+        ELSE excluded.unread
       END,
       updated_at = excluded.updated_at
   `);
@@ -168,6 +203,30 @@ export const createWhatsAppStore = (db: Database) => {
     WHERE message_key = @messageKey
   `);
 
+  const setChatUnreadStmt = db.prepare(`
+    INSERT INTO wa_chats (jid, name, is_group, last_message_ts, last_message_text, last_message_type, unread, updated_at)
+    VALUES (@jid, NULL, 0, 0, '', '', @unread, @updatedAt)
+    ON CONFLICT(jid) DO UPDATE SET
+      unread = excluded.unread,
+      updated_at = excluded.updated_at
+  `);
+
+  const incrementChatUnreadStmt = db.prepare(`
+    INSERT INTO wa_chats (jid, name, is_group, last_message_ts, last_message_text, last_message_type, unread, updated_at)
+    VALUES (@jid, NULL, 0, 0, '', '', @delta, @updatedAt)
+    ON CONFLICT(jid) DO UPDATE SET
+      unread = MAX(0, wa_chats.unread + excluded.unread),
+      updated_at = excluded.updated_at
+  `);
+
+  const markChatUnreadStmt = db.prepare(`
+    INSERT INTO wa_chats (jid, name, is_group, last_message_ts, last_message_text, last_message_type, unread, updated_at)
+    VALUES (@jid, NULL, 0, 0, '', '', 1, @updatedAt)
+    ON CONFLICT(jid) DO UPDATE SET
+      unread = CASE WHEN wa_chats.unread > 0 THEN wa_chats.unread ELSE 1 END,
+      updated_at = excluded.updated_at
+  `);
+
   const upsertContact = (input: Partial<WaContactRecord> & { jid: string }) => {
     const now = Date.now();
     upsertContactStmt.run({
@@ -200,8 +259,39 @@ export const createWhatsAppStore = (db: Database) => {
       lastMessageTs: input.lastMessageTs ?? 0,
       lastMessageText: input.lastMessageText ?? '',
       lastMessageType: input.lastMessageType ?? '',
-      unread: input.unread ?? 0,
+      hasLastMessageText: input.lastMessageText === undefined ? 0 : 1,
+      hasLastMessageType: input.lastMessageType === undefined ? 0 : 1,
+      unread: unreadCount(input.unread),
       updatedAt: now,
+    });
+  };
+
+  const setChatUnread = (jid: string, unread: number) => {
+    setChatUnreadStmt.run({
+      jid,
+      unread: unreadCount(unread) ?? 0,
+      updatedAt: Date.now(),
+    });
+  };
+
+  const incrementChatUnread = (jid: string, delta: number) => {
+    const amount = unreadCount(delta);
+    if (!amount) return;
+    incrementChatUnreadStmt.run({
+      jid,
+      delta: amount,
+      updatedAt: Date.now(),
+    });
+  };
+
+  const markChatRead = (jid: string) => {
+    setChatUnread(jid, 0);
+  };
+
+  const markChatUnread = (jid: string) => {
+    markChatUnreadStmt.run({
+      jid,
+      updatedAt: Date.now(),
     });
   };
 
@@ -298,15 +388,8 @@ export const createWhatsAppStore = (db: Database) => {
         `SELECT
            c.jid,
            COALESCE(
-             NULLIF(TRIM(c.name), ''),
-             NULLIF(TRIM(ct.name), ''),
-             NULLIF(TRIM(ct.notify), ''),
-             NULLIF(TRIM(ct.verified_name), ''),
-             NULLIF(TRIM(ct.username), ''),
-             NULLIF(TRIM(mapped_ct.name), ''),
-             NULLIF(TRIM(mapped_ct.notify), ''),
-             NULLIF(TRIM(mapped_ct.verified_name), ''),
-             NULLIF(TRIM(mapped_ct.username), '')
+             ${contactDisplayNameSql()},
+             NULLIF(TRIM(c.name), '')
            ) AS name,
            c.is_group,
            c.last_message_ts,
@@ -314,12 +397,7 @@ export const createWhatsAppStore = (db: Database) => {
            c.last_message_type,
            c.unread
          FROM wa_chats c
-         LEFT JOIN wa_contacts ct ON ct.jid = c.jid
-         LEFT JOIN wa_contacts mapped_ct
-           ON mapped_ct.jid = COALESCE(
-             (SELECT target_jid FROM wa_jid_map WHERE source_jid = c.jid LIMIT 1),
-             (SELECT source_jid FROM wa_jid_map WHERE target_jid = c.jid LIMIT 1)
-           )
+         ${contactLookupJoinsSql('c.jid')}
          ORDER BY c.last_message_ts DESC
          LIMIT ?`,
       )
@@ -389,23 +467,9 @@ export const createWhatsAppStore = (db: Database) => {
     const row = db
       .prepare(
         `SELECT
-           COALESCE(
-             NULLIF(TRIM(ct.name), ''),
-             NULLIF(TRIM(ct.notify), ''),
-             NULLIF(TRIM(ct.verified_name), ''),
-             NULLIF(TRIM(ct.username), ''),
-             NULLIF(TRIM(mapped_ct.name), ''),
-             NULLIF(TRIM(mapped_ct.notify), ''),
-             NULLIF(TRIM(mapped_ct.verified_name), ''),
-             NULLIF(TRIM(mapped_ct.username), '')
-           ) AS name
+           ${contactDisplayNameSql()} AS name
          FROM (SELECT ? AS jid) lookup
-         LEFT JOIN wa_contacts ct ON ct.jid = lookup.jid
-         LEFT JOIN wa_contacts mapped_ct
-           ON mapped_ct.jid = COALESCE(
-             (SELECT target_jid FROM wa_jid_map WHERE source_jid = lookup.jid LIMIT 1),
-             (SELECT source_jid FROM wa_jid_map WHERE target_jid = lookup.jid LIMIT 1)
-           )
+         ${contactLookupJoinsSql('lookup.jid')}
          LIMIT 1`,
       )
       .get(jid) as any;
@@ -504,6 +568,10 @@ export const createWhatsAppStore = (db: Database) => {
     upsertContact,
     upsertJidMapping,
     upsertChat,
+    setChatUnread,
+    incrementChatUnread,
+    markChatRead,
+    markChatUnread,
     upsertMessage,
     updateMessage,
     markMessageDeleted,

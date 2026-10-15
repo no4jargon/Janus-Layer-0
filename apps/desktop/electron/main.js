@@ -10,6 +10,11 @@ import {
   createChaiRuntime,
 } from '@chai/core';
 import {
+  createAgentBridgeHttpServer,
+  createAgentBridgeService,
+  loadAgentBridgeConfig,
+} from '@chai/agent-bridge';
+import {
   createAiOutputStore,
   createClusterStore,
   createEmailStore,
@@ -46,6 +51,11 @@ let whatsappConnector = null;
 let gmailSendService = null;
 let whatsappSendService = null;
 let workflowExtractor = null;
+let agentBridgeService = null;
+let agentBridgeServer = null;
+let agentTaskRefreshTimer = null;
+let shutdownStarted = false;
+let shutdownComplete = false;
 let updaterConfigured = false;
 let lastUpdateInfo = null;
 let updatePollTimer = null;
@@ -64,6 +74,21 @@ const broadcastEvent = (channel, payload) => {
 const broadcastSnapshot = () => {
   if (!runtime) return;
   broadcastEvent('chai:runtime-snapshot', runtime.getSnapshot());
+};
+
+const refreshAgentResponseTasks = (reason) => {
+  if (!agentBridgeService) return;
+  try {
+    agentBridgeService.refreshResponseTasks({
+      agentId: 'chai-runtime',
+      requestId: `runtime:${reason}:${Date.now()}`,
+    });
+  } catch (error) {
+    runtime?.logger?.warn?.('agent bridge task refresh failed', {
+      reason,
+      error: String(error),
+    });
+  }
 };
 
 const createMainWindow = async () => {
@@ -146,6 +171,7 @@ const registerIpcHandlers = () => {
         connector,
         type: 'sync.completed',
       });
+      refreshAgentResponseTasks(`sync:${connector}`);
     } catch (error) {
       broadcastEvent('chai:connector:event', {
         connector,
@@ -235,6 +261,13 @@ const registerIpcHandlers = () => {
     }));
   });
 
+  ipcMain.handle('chai:whatsapp:mark-chat-read', (_event, jid) => {
+    if (!runtime) return { ok: false };
+    const store = createWhatsAppStore(runtime.db);
+    store.markChatRead(jid);
+    return { ok: true };
+  });
+
   ipcMain.handle('chai:whatsapp:send', async (_event, payload) => {
     if (!whatsappSendService) {
       throw new Error('WhatsApp send service is not available.');
@@ -244,6 +277,28 @@ const registerIpcHandlers = () => {
 
   ipcMain.handle('chai:whatsapp:status', () => {
     return whatsappConnector?.getStatus() ?? null;
+  });
+
+  ipcMain.handle('chai:agent-bridge:status', () => {
+    return agentBridgeServer?.status() ?? {
+      enabled: false,
+      running: false,
+      host: null,
+      port: null,
+      rpcUrl: null,
+      mcpUrl: null,
+      tokenPath: null,
+      scopes: [],
+    };
+  });
+
+  ipcMain.handle('chai:agent-bridge:audit', (_event, input) => {
+    if (!agentBridgeService) return [];
+    return agentBridgeService.listAudit({
+      agentId: 'chai-renderer',
+      requestId: `renderer:audit:${Date.now()}`,
+      limit: input?.limit ?? 50,
+    });
   });
 
   ipcMain.handle('chai:cluster:list', () => {
@@ -408,12 +463,68 @@ const registerIpcHandlers = () => {
   ipcMain.handle('chai:update:last', () => lastUpdateInfo);
 
   ipcMain.handle('chai:migration:retry', async () => {
+    await stopAgentBridge();
+    await whatsappConnector?.dispose();
     runtime?.close();
     runtime = await createRuntime();
     rebuildWorkflowExtractor(runtime.settingsStore.read());
+    await startAgentBridge();
     broadcastSnapshot();
     return runtime.getSnapshot();
   });
+};
+
+const startAgentBridge = async () => {
+  if (!runtime || runtime.migrationFailure) return;
+  try {
+    const config = loadAgentBridgeConfig({
+      baseDir: runtime.paths.baseDir,
+      logger: runtime.logger,
+    });
+    if (!config.enabled) return;
+    agentBridgeService = createAgentBridgeService({
+      db: runtime.db,
+      logger: runtime.logger,
+      gmailSender: gmailSendService,
+      whatsappSender: whatsappSendService,
+    });
+    agentBridgeServer = createAgentBridgeHttpServer({
+      service: agentBridgeService,
+      config,
+      logger: runtime.logger,
+    });
+    await agentBridgeServer.start();
+    refreshAgentResponseTasks('startup');
+    // Also discover messages mirrored while no window is open, and recover
+    // watches after restart. This creates tasks; it never sends replies.
+    agentTaskRefreshTimer = setInterval(() => {
+      refreshAgentResponseTasks('poll');
+    }, 30_000);
+    agentTaskRefreshTimer.unref();
+  } catch (error) {
+    runtime.logger.error('agent bridge server failed to start', {
+      error: String(error),
+    });
+    await stopAgentBridge();
+  }
+};
+
+const stopAgentBridge = async () => {
+  if (agentTaskRefreshTimer) {
+    clearInterval(agentTaskRefreshTimer);
+    agentTaskRefreshTimer = null;
+  }
+  const server = agentBridgeServer;
+  agentBridgeServer = null;
+  agentBridgeService = null;
+  if (!server) return;
+  try {
+    await server.close();
+  } catch (error) {
+    runtime?.logger?.warn?.('agent bridge server close failed', {
+      error: String(error),
+    });
+  }
 };
 
 const rebuildWorkflowExtractor = (settings) => {
@@ -586,6 +697,12 @@ const createRuntime = async () => {
         adapter: createDesktopBaileysSessionAdapter(whatsappStore),
         onEvent: (event) => {
           broadcastEvent('chai:whatsapp:event', event);
+          if (
+            event?.type === 'message-upsert' ||
+            event?.type === 'history-loaded'
+          ) {
+            refreshAgentResponseTasks(`whatsapp:${event.type}`);
+          }
         },
       });
 
@@ -606,6 +723,7 @@ const createRuntime = async () => {
 const bootstrap = async () => {
   runtime = await createRuntime();
   rebuildWorkflowExtractor(runtime.settingsStore.read());
+  await startAgentBridge();
   registerIpcHandlers();
   await createMainWindow();
   broadcastSnapshot();
@@ -661,22 +779,41 @@ if (!gotLock) {
 
   app.on('second-instance', () => {
     const [win] = BrowserWindow.getAllWindows();
-    if (!win) return;
+    if (!win) {
+      createMainWindow();
+      return;
+    }
     if (win.isMinimized()) win.restore();
     win.focus();
   });
 
   app.on('window-all-closed', () => {
+    if (agentBridgeServer?.status().running) return;
     if (process.platform !== 'darwin') {
       app.quit();
     }
   });
 
-  app.on('before-quit', () => {
+  app.on('before-quit', (event) => {
+    if (shutdownComplete) return;
+    event.preventDefault();
+    if (shutdownStarted) return;
+    shutdownStarted = true;
     stopUpdatePolling();
-    runtime?.close();
-    workflowExtractor?.dispose().catch(() => {
-      /* dispose is best-effort */
-    });
+    void (async () => {
+      try {
+        await stopAgentBridge();
+        await whatsappConnector?.dispose();
+        await workflowExtractor?.dispose();
+      } catch (error) {
+        runtime?.logger?.warn?.('shutdown cleanup failed', {
+          error: String(error),
+        });
+      } finally {
+        runtime?.close();
+        shutdownComplete = true;
+        app.quit();
+      }
+    })();
   });
 }

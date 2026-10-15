@@ -37,6 +37,13 @@ export type DiagnosticsBundle = {
     lastSyncedAt: string | null;
     updatedAt: string;
   }>;
+  agentBridgeAudit: Array<{
+    agentId: string;
+    action: string;
+    target: string | null;
+    status: string;
+    createdAt: number;
+  }>;
   backups: Array<{ filename: string; sizeBytes: number; createdAtMs: number }>;
   logTail: string[];
 };
@@ -90,6 +97,36 @@ const readConnectorState = (
   }
 };
 
+const readAgentBridgeAudit = (
+  db: Database,
+): DiagnosticsBundle['agentBridgeAudit'] => {
+  try {
+    const rows = db
+      .prepare(
+        `SELECT agent_id, action, target, status, created_at
+         FROM agent_bridge_audit_events
+         ORDER BY created_at DESC
+         LIMIT 200`,
+      )
+      .all() as Array<{
+      agent_id: string;
+      action: string;
+      target: string | null;
+      status: string;
+      created_at: number;
+    }>;
+    return rows.map((row) => ({
+      agentId: row.agent_id,
+      action: row.action,
+      target: row.target,
+      status: row.status,
+      createdAt: row.created_at,
+    }));
+  } catch {
+    return [];
+  }
+};
+
 const readBackups = (paths: AppDataPaths): DiagnosticsBundle['backups'] => {
   const backupDir = path.join(paths.baseDir, 'backups');
   if (!existsSync(backupDir)) return [];
@@ -136,6 +173,7 @@ export const buildDiagnosticsBundle = (
   settings: sanitizeSettings(input.settings),
   schemaMigrations: readSchemaMigrations(input.db),
   connectors: readConnectorState(input.db),
+  agentBridgeAudit: readAgentBridgeAudit(input.db),
   backups: readBackups(input.paths),
   logTail: readLogTail(input.paths, input.logTailLines ?? 200),
 });

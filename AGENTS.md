@@ -62,8 +62,10 @@ If any of the following change, update plan/progress/docs accordingly:
 
 ## Local app reset convention
 
-When the user says "clear the app", interpret that as clearing everything related to Chai unless they specify a narrower scope. On macOS, this includes deleting the entire app data directory:
+When the user says "clear the app", interpret that as clearing everything related to Chai unless they specify a narrower scope. On macOS, this includes deleting the installed app bundle and the entire app data directory:
 
+`/Applications/Chai.app`
+`~/Applications/Chai.app`
 `~/Library/Application Support/Chai`
 
 When working in development mode, also include repo-local development data such as `.dev-data`. Because this is destructive and can target files outside the workspace, confirm the exact paths and request escalation before deleting.
