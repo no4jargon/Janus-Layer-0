@@ -8,7 +8,7 @@ Scope tracked here: desktop-first, local-first freelancer communications workspa
 
 Current phase: **Phase 1-4 complete in code**, with one deliberate scope shift in distribution: builds ship **unsigned** via **GitHub Releases**, with a per-release `latest.json` driving a full-window forced-update screen on every prior version by default. Users click through to the GitHub release page in their browser to download and install the new installer. Auto-download / quit-and-install via `electron-updater` is intentionally not used because unsigned macOS binaries cannot self-replace; the wiring is left in place behind feature flags so it can be re-enabled if/when builds are signed.
 
-The current release candidate is `v0.1.13` (`apps/desktop/package.json`), including the local agent bridge and WhatsApp repairs. Release validation is in progress on 2026-10-15. Installed cross-platform account QA remains a separate acceptance step.
+Published beta: **v0.1.13**, released on 2026-10-15 with the local agent bridge and WhatsApp repairs. macOS ARM64/Intel and Windows x64 installers plus update feeds are public. Installed Gmail/Windows account QA remains a separate acceptance step.
 
 Overall summary:
 - **Phase 0 is complete.**
@@ -86,7 +86,7 @@ The renderer is a 3-pane workspace: sidebar with WhatsApp / Email / Clusters tab
 - [x] Optional-update banner in the sidebar (only fires when `MIN_SUPPORTED_VERSION` is opted out below `latestVersion`); links to GitHub release page; dismissable.
 - [x] electron-builder release config (mac dmg + zip, win nsis, linux AppImage) with `provider: github` for `no4jargon/Janus-Layer-0`. `pnpm release:desktop` toggles between unsigned-dir (default) and unsigned-release-publish modes via `CHAI_RELEASE=1`. `CSC_*` / `APPLE_*` signing env vars are still wired so signing can be turned on later without code changes.
 - [x] Update artifact hosting: GitHub Releases. `apps/desktop/electron/package.js` writes `dist/latest.json` per release (with `MIN_SUPPORTED_VERSION` defaulting to the new version → forces every prior build) and uploads it via `gh release upload` when `CHAI_PUBLISH=1`.
-- [x] Release pipeline has produced tagged beta candidates through `v0.1.11`; current candidate uses `apps/desktop/package.json` version `0.1.11`.
+- [x] Release pipeline has published `v0.1.13`; `apps/desktop/package.json` owns the installer version. Older drafts are preserved.
 - [x] Migration testing harness (`scripts/test-migrations.js`) — fresh bootstrap, idempotency, v1-baseline upgrade with row preservation; runs via `pnpm test:migrations`
 - [x] CI workflow: `.github/workflows/ci.yml` runs install + build + typecheck + migrations test + verify on every PR
 - [x] Release workflow: `.github/workflows/release.yml` triggers on `v*` tag push (or manual dispatch); builds + publishes draft release + `latest.json` using the repo's `GITHUB_TOKEN` (no PAT needed)
@@ -116,7 +116,7 @@ Status: code complete (diagnostics, updater download/install, required + optiona
 - WhatsApp pairing QR now renders on-device as an accessible SVG using `qrcode.react` 4.2.0, replacing the external QR-image request that exposed pairing material to a third-party service.
 - Desktop and WhatsApp connector dependencies now pin Baileys `7.0.0-rc12`, the minimum patched v7 release for [GHSA-qvv5-jq5g-4cgg / CVE-2026-48063](https://github.com/WhiskeySockets/Baileys/security/advisories/GHSA-qvv5-jq5g-4cgg). The prior `7.0.0-rc.9` was affected by message/history spoofing and app-state corruption. No connector API compatibility edits were needed.
 - Validation passed: workspace `pnpm typecheck`, UI production build, seven WhatsApp-store tests, three agent-bridge tests, synthetic local-SVG rendering, and a patched-Baileys export/group-JID smoke check without connecting.
-- These repairs are local source changes, not a published installer release. Packaging, a real phone QR scan, session reconnect, and delivery to the intended group still need verification on the rebuilt app.
+- These repairs first landed locally. They are now included in published `v0.1.13`; later installed-app and transport acceptance is recorded below.
 
 ## Current problems / risks
 
@@ -139,13 +139,14 @@ Status: code complete (diagnostics, updater download/install, required + optiona
 - Added session-preserving WhatsApp disposal for retry/quit, current QR/status restoration when reopening a window, and preview preservation on metadata-only chat updates. Explicit reconnect after logout now backs up expired auth privately and opens a fresh pairing session.
 - Local validation passed: frozen-lockfile install, workspace build/typecheck, 11 bridge tests, 8 store tests, 9 connector lifecycle tests, 6 prompt tests, 21 notification tests, fresh/idempotent/upgrade migration harness, and data-path smoke checks.
 - Built and installed `/Applications/Chai.app` version 0.1.12 without clearing existing user data. Packaged-app checks passed for startup/migrations, bridge health, authenticated MCP initialization/tool discovery, rejection of unauthenticated/foreign-origin calls, renderer bridge status, required-update blocking, optional-update banner, close/reopen, quit/port closure, and restart/token preservation.
-- Installed the corrected `/Applications/Chai.app` version 0.1.13. Local bridge health and authenticated MCP discovery passed again; explicit reconnect of the actual logged-out session produced a fresh on-device QR and preserved the expired credentials in a private backup. Notes is pinned in the local notification-helper configuration; manual phone pairing and live send confirmation are pending.
+- Installed the corrected `/Applications/Chai.app` version 0.1.13. Local bridge health and authenticated MCP discovery passed again; explicit reconnect of the actual logged-out session produced a fresh on-device QR and preserved the expired credentials in a private backup. Notes is pinned in the local notification-helper configuration. The user paired WhatsApp, one explicitly authorized setup message was submitted to Notes with a valid provider message ID, and a subsequent quit/relaunch restored the connected session without scanning again.
 - Release CI now requires app OAuth configuration, validates tag/version/update policy, builds both Mac architectures plus Windows x64, and verifies every installer and feed while keeping the release a draft. Existing `v0.1.10` and `v0.1.11` drafts are preserved. `v0.1.12` is retained as an unpublished draft after a live logged-out pairing check exposed a recovery bug; `v0.1.13` adds the correction.
-- Publishing `v0.1.13` is in progress. The local Mac app is unsigned; Windows account/UI QA, manual phone pairing, Gmail OAuth acceptance, and live notification delivery remain unverified.
+- Published `v0.1.13` at https://github.com/no4jargon/Janus-Layer-0/releases/tag/v0.1.13. Both platform builds and their regression suites passed; Windows actually ran 8 DB, 11 bridge, and 9 connector tests. The first final verification failed because its read-only workflow token could not view the draft. Corrected draft permissions and verification-only dispatch passed in run `38773063161`; the installer artifacts still come from the successful build jobs in run `38772012987`. Source tag `v0.1.13` remains unchanged.
 
-## Immediate next steps
+- Public verification passed without authentication: all three installer download URLs return HTTP 200, `latest.json` reports latest/minimum 0.1.13 on beta, 0.1.13 receives up-to-date, and 0.1.9 receives required-update. The installed app also shows “Up to date (0.1.13 on beta)” and “Status: Running” for the bridge.
 
-1. Complete the `v0.1.13` macOS/Windows release workflow, review its assets/feed, publish, and verify the public `latest.json` reports the intended minimum version.
-2. Pair WhatsApp manually in the installed Mac app, verify reconnect, configure the exact Notes group, and run an explicitly authorized live notification test.
-3. Complete Gmail account acceptance and the Windows installed UI checklist in `docs/QA_PLAN.md`.
-4. Provision Apple / Microsoft signing credentials after beta QA; the current distribution uses unsigned manual installers.
+## Remaining beta acceptance
+
+1. Complete Gmail account acceptance and the Windows installed UI checklist in `docs/QA_PLAN.md`.
+2. Confirm receiving-device/read behavior as desired; the authorized Notes setup send is provider-confirmed and mirrored in Chai.
+3. Provision Apple / Microsoft signing credentials after beta QA; the current distribution uses unsigned manual installers.

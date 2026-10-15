@@ -160,3 +160,14 @@ The plan calls for `dev` / `beta` / `stable` channels. For now the beta channel 
 The workflow leaves successful builds as a draft. Publishing is the explicit
 final step after local and remote validation. Do not move an existing version
 tag or rebuild an already-published release with different source.
+
+For an existing draft whose installer build jobs already succeeded, rerun only
+asset/feed verification with the current workflow:
+
+```bash
+gh workflow run release.yml --ref main -f ref=v0.1.13 -f verify_only=true -f channel=beta
+```
+
+The verifier needs `contents: write` to read draft release metadata and assets.
+A verification-only run skips installer jobs; inspect the original build results
+and test counts before publishing that draft.

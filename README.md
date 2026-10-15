@@ -10,9 +10,9 @@ The living project references are:
 
 ## Current status
 
-Phases 1-4 are **code complete** for v1. The desktop app version is owned by `apps/desktop/package.json`; the latest checked-in release candidate is `v0.1.13`.
+Phases 1-4 are **code complete** for v1. The desktop app version is owned by `apps/desktop/package.json`; the latest published beta is [`v0.1.13`](https://github.com/no4jargon/Janus-Layer-0/releases/tag/v0.1.13).
 
-Local Mac builds have passed bridge lifecycle and required/optional update smoke checks; v0.1.13 also passed live expired-session recovery to a fresh pairing QR. Account pairing, Windows installed UI QA, and signing remain operational acceptance steps; see `docs/PROGRESS.md`.
+Local Mac builds have passed bridge lifecycle and required/optional update smoke checks; v0.1.13 also passed live expired-session recovery to a fresh pairing QR. WhatsApp pairing, reconnect, and a provider-confirmed Notes setup send also passed. Gmail account acceptance, Windows installed UI QA, and signing remain operational acceptance steps; see `docs/PROGRESS.md`.
 
 The renderer is a 3-pane workspace: sidebar with WhatsApp / Email / Clusters tabs, thread + composer, and AI insights panel. The shell wraps it with first-run onboarding, a settings modal, migration recovery, optional-update banner, and required-update enforcement screen.
 
