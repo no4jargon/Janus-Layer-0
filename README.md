@@ -60,7 +60,7 @@ For people using a trusted assistant on the same computer, Chai also provides a 
 
 Chai is a **single-user desktop beta**. WhatsApp and Gmail are the supported channels. Mobile sync, additional channels, calling, and team collaboration are outside the current feature set.
 
-Phases 1–4 are code complete for v1. The desktop version is owned by `apps/desktop/package.json`; the published beta documented here is [`v0.1.13`](https://github.com/no4jargon/Janus-Layer-0/releases/tag/v0.1.13). Gmail account acceptance, Windows installed UI QA, and signing remain operational acceptance steps. Personal WhatsApp support depends on WhatsApp Web behavior and may require reconnecting.
+Phases 1–4 are code complete for v1. The desktop version is owned by `apps/desktop/package.json`. The current beta is [v0.1.15](https://github.com/no4jargon/Janus-Layer-0/releases/tag/v0.1.15). Live Gmail and WhatsApp read sync, Windows installed UI QA, and signing remain open. Personal WhatsApp support depends on WhatsApp Web behavior and may require reconnecting.
 
 Project references: [Plan](docs/PLAN.md) · [Progress and known risks](docs/PROGRESS.md) · [QA checklist](docs/QA_PLAN.md) · [Release guide](docs/RELEASE.md).
 

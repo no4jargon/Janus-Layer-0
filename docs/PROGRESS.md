@@ -1,14 +1,14 @@
 # Productization Progress Tracker
 
 Status: active
-Last updated: 2026-10-30
+Last updated: 2026-11-13
 Scope tracked here: desktop-first, local-first freelancer communications workspace.
 
 ## Overall status
 
 Current phase: **Phase 1-4 complete in code**, with one deliberate scope shift in distribution: builds ship **unsigned** via **GitHub Releases**, with a per-release `latest.json` driving a full-window forced-update screen on every prior version by default. Users click through to the GitHub release page in their browser to download and install the new installer. Auto-download / quit-and-install via `electron-updater` is intentionally not used because unsigned macOS binaries cannot self-replace; the wiring is left in place behind feature flags so it can be re-enabled if/when builds are signed.
 
-Published beta: **v0.1.13**, released on 2026-10-15 with the local agent bridge and WhatsApp repairs. macOS ARM64/Intel and Windows x64 installers plus update feeds are public. Installed Gmail/Windows account QA remains a separate acceptance step.
+Published beta: **v0.1.15**, released on 2026-11-13 with private reading and cross-device unread sync. Mac installers for Apple silicon and Intel, the Windows x64 installer, and the update feeds are public. Live account sync and Windows installed UI QA remain open.
 
 Overall summary:
 - **Phase 0 is complete.**
@@ -125,7 +125,8 @@ Status: code complete (diagnostics, updater download/install, required + optiona
 - WhatsApp consumes provider chat read clears and inbound read-status updates without calling `readMessages` or `chatModify`. Missing/neutral provider counts are preserved rather than guessed; cross-device freshness depends on WhatsApp delivering its read/app-state events.
 - Gmail now consumes paginated history including label-only changes, reconciles older mirrored threads on initial/expired history, and updates read flags with GET-only metadata requests. Connected accounts sync on startup, window focus, and every minute. Unchanged threads skip body downloads. Connector sync calls coalesce, disconnect waits for active writes, and shutdown/retry drain pending operations before closing SQLite.
 - Validation passed: workspace build/typecheck; 27 DB, 7 runtime, 8 Gmail, 12 WhatsApp, 11 bridge, 6 prompt, and 21 notification-helper tests; fresh/idempotent/upgrade migrations and data-path checks. Isolated browser/IPC smoke tests covered both channel opens, background/refocus, stale payloads, modal overlays, native window guards, and automatic Gmail sync. Focus/visibility were simulated; live cross-device account acceptance remains pending.
-- Built and inspected the local unsigned macOS ARM64 app at `apps/desktop/dist/mac-arm64/Chai.app`. This feature has not been installed over `/Applications/Chai.app` or published; the public beta remains v0.1.13.
+- Built and inspected the first local macOS ARM64 package on 2026-10-30. Published [v0.1.15](https://github.com/no4jargon/Janus-Layer-0/releases/tag/v0.1.15) on 2026-11-13 after the [release workflow](https://github.com/no4jargon/Janus-Layer-0/actions/runs/43405083173) passed 92 macOS tests and 65 Windows tests, including the migration checks on both platforms. The v0.1.14 draft remains unpublished after a Windows test fixture path failure. The v0.1.15 tag includes the fix.
+- Verified the public installer links and update feed. The beta feed requires v0.1.15. Installed the checksum-verified Apple silicon download in `/Applications/Chai.app` after moving the old app and local state to Trash. Startup created a clean database, applied migration 008, and started the local bridge. Gmail and WhatsApp require reconnection for live sync testing.
 
 ## Current problems / risks
 
