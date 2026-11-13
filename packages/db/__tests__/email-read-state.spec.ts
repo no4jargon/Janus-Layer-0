@@ -3,12 +3,13 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   bootstrapDatabase, createEmailStore,
   type EmailMessageRecord, type EmailThreadRecord,
 } from '../src/index.js';
 
-const migrationsDir = new URL('../migrations/', import.meta.url).pathname;
+const migrationsDir = fileURLToPath(new URL('../migrations/', import.meta.url));
 let dir: string;
 let db: ReturnType<typeof bootstrapDatabase>['db'];
 let store: ReturnType<typeof createEmailStore>;
