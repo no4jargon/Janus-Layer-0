@@ -139,6 +139,8 @@ const createFixtureDb = () => {
     );
   `);
 
+  db.exec(readFileSync(new URL('../../db/migrations/008_local_read_state.sql', import.meta.url), 'utf8'));
+
   const now = Math.floor(Date.now() / 1000);
   db.prepare(
     `INSERT INTO wa_contacts (jid, name, notify, verified_name, username, phone_number, img_url, updated_at)

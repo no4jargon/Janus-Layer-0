@@ -141,8 +141,10 @@ jobs:
       - name: Bridge and data regression tests
         run: |
           pnpm --filter @chai/db test
+          pnpm --filter @chai/core test
           pnpm --filter @chai/agent-bridge test
           pnpm --filter @chai/connectors-whatsapp test
+          pnpm --filter @chai/connectors-gmail test
           pnpm --filter @chai/ai-prompts test
           python3 -m unittest discover -s scripts/tests -p 'test_*.py'
           pnpm test:migrations
@@ -214,8 +216,10 @@ jobs:
         shell: bash
         run: |
           pnpm --filter @chai/db test
+          pnpm --filter @chai/core test
           pnpm --filter @chai/agent-bridge test
           pnpm --filter @chai/connectors-whatsapp test
+          pnpm --filter @chai/connectors-gmail test
           pnpm test:migrations
           pnpm verify:data-paths
 

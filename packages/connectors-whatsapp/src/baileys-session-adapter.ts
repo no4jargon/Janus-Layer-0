@@ -54,6 +54,8 @@ export interface BaileysSessionAdapter {
   incrementChatUnread(jid: string, delta: number): void | Promise<void>;
   markChatRead(jid: string): void | Promise<void>;
   markChatUnread(jid: string): void | Promise<void>;
+  /** Apply an inbound read observed on another device, once per message. */
+  markMessageRead(messageKey: string): void | Promise<void>;
   upsertMessage(input: WaMessageRecord): void | Promise<void>;
   getMessage(
     messageKey: string,

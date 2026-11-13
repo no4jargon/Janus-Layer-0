@@ -3,6 +3,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, mock, test } from 'node:test';
+import type { WaMessageRecord } from '@chai/db';
+import type { WaChatUpsert } from '../src/baileys-session-adapter.js';
 
 // Exercise the connector's real event/lifecycle code without pairing, network
 // requests, a WhatsApp send, or any real account files.
@@ -35,6 +37,8 @@ class FakeSocket {
     this.order.push('logout');
     void this.emit({ 'connection.update': { connection: 'close' } });
   }
+  readMessages() { assert.fail('mirroring and reading must never send read receipts'); }
+  chatModify() { assert.fail('local acknowledgement must never modify WhatsApp read state'); }
 }
 
 mock.module('baileys', {
@@ -67,6 +71,11 @@ let directory: string;
 let connector: Connector;
 let writes: string[];
 let onChat: () => Promise<void>;
+let chatUpserts: WaChatUpsert[];
+let unreadUpdates: Array<{ operation: string; jid: string; count?: number }>;
+let readMessages: string[];
+let messages: Map<string, WaMessageRecord>;
+let emittedEvents: Array<{ type: string; payload: unknown }>;
 
 beforeEach(() => {
   directory = mkdtempSync(path.join(tmpdir(), 'chai-wa-lifecycle-'));
@@ -75,6 +84,11 @@ beforeEach(() => {
   writeFileSync(path.join(session, 'creds.json'), 'preserved credentials');
   sockets.length = 0;
   writes = [];
+  chatUpserts = [];
+  unreadUpdates = [];
+  readMessages = [];
+  messages = new Map();
+  emittedEvents = [];
   onChat = async () => {};
   loadAuth = async () => ({ state, saveCreds: async () => {} });
   loadVersion = async () => ({ version: [2, 3000, 1] });
@@ -82,17 +96,19 @@ beforeEach(() => {
   connector = createWhatsAppConnector({
     keystoreDir: directory,
     logger,
+    onEvent: (event) => { emittedEvents.push(event); },
     adapter: {
       upsertJidMapping: () => { writes.push('mapping'); },
       upsertContact: () => { writes.push('contact'); },
-      upsertChat: async () => { writes.push('chat'); await onChat(); },
-      setChatUnread: () => { writes.push('unread'); },
-      incrementChatUnread: () => { writes.push('unread'); },
-      markChatRead: () => { writes.push('read'); },
-      markChatUnread: () => { writes.push('unread'); },
-      upsertMessage: () => { writes.push('message'); },
-      getMessage: () => null,
-      updateMessage: () => { writes.push('message'); },
+      upsertChat: async (chat) => { writes.push('chat'); chatUpserts.push(chat); await onChat(); },
+      setChatUnread: (jid, count) => { writes.push('unread'); unreadUpdates.push({ operation: 'set', jid, count }); },
+      incrementChatUnread: (jid, count) => { writes.push('unread'); unreadUpdates.push({ operation: 'increment', jid, count }); },
+      markChatRead: () => { assert.fail('provider state must not set local acknowledgement'); },
+      markChatUnread: (jid) => { writes.push('unread'); unreadUpdates.push({ operation: 'mark-unread', jid }); },
+      markMessageRead: (key) => { readMessages.push(key); },
+      upsertMessage: (message) => { writes.push('message'); messages.set(message.messageKey, message); },
+      getMessage: (key) => messages.get(key) ?? null,
+      updateMessage: (key, patch) => { writes.push('message'); Object.assign(messages.get(key)!, patch); },
       markMessageDeleted: () => { writes.push('delete'); },
       deleteAllMessagesForChat: () => { writes.push('delete'); },
     },
@@ -115,6 +131,66 @@ const open = async () => {
   assert.equal(connector.getActiveSocket(), socket);
   return socket;
 };
+
+test('mirrors provider unread snapshots, read clears, and unread deltas without sending receipts', async () => {
+  const socket = await open();
+  const jid = '123@s.whatsapp.net';
+  await socket.emit({ 'messaging-history.set': { chats: [{ id: jid, unreadCount: 3 }] } });
+  assert.equal(chatUpserts.at(-1)?.unread, 3);
+  await socket.emit({ 'chats.update': [{ id: jid, unreadCount: 2 }] });
+  await socket.emit({ 'chats.update': [{ id: jid, unreadCount: 0 }] });
+  await socket.emit({ 'chats.update': [{ id: jid, unreadCount: -1 }] });
+  await socket.emit({ 'chats.update': [{ id: jid, name: 'metadata only' }] });
+  await socket.emit({ 'chats.update': [{ id: jid, unreadCount: null }] });
+  assert.deepEqual(unreadUpdates, [
+    { operation: 'increment', jid, count: 2 },
+    { operation: 'set', jid, count: 0 },
+    { operation: 'mark-unread', jid },
+  ]);
+  assert.equal(chatUpserts.at(-1)?.unread, undefined, 'initial app-state null is a neutral update');
+  assert.equal(emittedEvents.filter((event) => event.type === 'chat-update').length, 5);
+});
+
+test('incoming READ and PLAYED updates acknowledge only the messages read on another device', async () => {
+  const socket = await open();
+  const incomingKey = { remoteJid: '123@s.whatsapp.net', id: 'incoming', fromMe: false };
+  const outgoingKey = { remoteJid: '123@s.whatsapp.net', id: 'outgoing', fromMe: true };
+  const status = baileys.WAMessageStatus;
+  await socket.emit({ 'messages.upsert': { type: 'notify', messages: [
+    { key: incomingKey, messageTimestamp: 1, message: { conversation: 'incoming' }, status: status.DELIVERY_ACK },
+    { key: outgoingKey, messageTimestamp: 2, message: { conversation: 'outgoing' }, status: status.DELIVERY_ACK },
+  ] } });
+  await socket.emit({ 'messages.update': [
+    { key: incomingKey, update: { status: status.READ } },
+    { key: outgoingKey, update: { status: status.READ } },
+  ] });
+  assert.deepEqual(readMessages, ['123@s.whatsapp.net|incoming|0|']);
+  await socket.emit({ 'messages.update': [{ key: incomingKey, update: { status: status.PLAYED } }] });
+  await socket.emit({ 'messages.update': [{ key: incomingKey, update: { status: status.DELIVERY_ACK } }] });
+  assert.equal(messages.get('123@s.whatsapp.net|incoming|0|')?.status, status.PLAYED,
+    'late delivery updates must not undo an external read');
+  assert.deepEqual(readMessages, ['123@s.whatsapp.net|incoming|0|', '123@s.whatsapp.net|incoming|0|']);
+  assert.deepEqual(unreadUpdates, [], 'a message receipt must not clear unrelated unread messages');
+});
+
+test('serializes provider event batches so a later read clear wins an asynchronous unread delta', async () => {
+  const socket = await open();
+  const jid = '123@s.whatsapp.net';
+  let release!: () => void;
+  let chatCalls = 0;
+  onChat = () => ++chatCalls === 1 ? new Promise((resolve) => { release = resolve; }) : Promise.resolve();
+  const incrementing = socket.emit({ 'chats.update': [{ id: jid, unreadCount: 1 }] });
+  await flush();
+  const reading = socket.emit({ 'chats.update': [{ id: jid, unreadCount: 0 }] });
+  await flush();
+  assert.deepEqual(unreadUpdates, [], 'later batches wait for accepted persistence');
+  release();
+  await Promise.all([incrementing, reading]);
+  assert.deepEqual(unreadUpdates, [
+    { operation: 'increment', jid, count: 1 },
+    { operation: 'set', jid, count: 0 },
+  ]);
+});
 
 test('dispose ends the socket, ignores stale events, and preserves linked-device credentials', async () => {
   const socket = await open();

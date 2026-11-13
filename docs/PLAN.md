@@ -111,6 +111,8 @@ Store locally:
 - AI outputs
 - settings
 - sync state
+- separate per-message local read acknowledgements and inbound provider read state;
+  opening a conversation never sends WhatsApp read receipts or changes Gmail labels
 - diagnostics metadata
 - local agent bridge audit events and response tasks
 

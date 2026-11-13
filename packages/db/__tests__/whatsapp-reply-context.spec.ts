@@ -115,6 +115,13 @@ describe('WhatsApp store', () => {
   });
 
   it('increments, clears, and marks local WhatsApp unread counts', () => {
+    for (let i = 1; i <= 3; i += 1) {
+      store.upsertMessage(baseMessage({
+        messageKey: `unread-${i}`,
+        keyId: `unread-${i}`,
+        messageTimestamp: i,
+      }));
+    }
     store.incrementChatUnread(CHAT_JID, 1);
     store.incrementChatUnread(CHAT_JID, 2);
 
@@ -123,6 +130,7 @@ describe('WhatsApp store', () => {
     store.markChatRead(CHAT_JID);
     assert.equal(getChat().unread, 0);
 
+    store.setChatUnread(CHAT_JID, 0);
     store.markChatUnread(CHAT_JID);
     assert.equal(getChat().unread, 1);
 

@@ -97,6 +97,12 @@ See `docs/RELEASE.md` for signing + publish details, and `docs/QA_PLAN.md` for t
 
 `pnpm dev` triggers a one-shot build of `@chai/{shared,db,core,agent-bridge,connectors-gmail,connectors-whatsapp}` and `chai` so the Electron main process can resolve them at runtime.
 
+Reading a conversation clears its unread badge only in Chai. It sends no
+WhatsApp read receipts and does not change Gmail's read labels. Reads made in
+other clients sync inward: WhatsApp uses provider read/app-state events; Gmail
+checks on startup, focus, and every minute while connected. Local read state
+survives restarts. Background or obscured conversations stay unread until viewed.
+
 ## Local agent bridge
 
 Chai starts a trusted local agent bridge with the desktop runtime. It binds to `127.0.0.1:43124` by default and exposes:

@@ -142,6 +142,19 @@ withTempDb((dbPath) => {
   baseline.db
     .prepare('INSERT INTO app_settings (key, value) VALUES (?, ?)')
     .run('seed', 'preserved-across-upgrade');
+  baseline.db.exec(`
+    INSERT INTO email_accounts
+      (id, user_id, provider, email_address, created_at, updated_at)
+      VALUES ('upgrade-account', 'local-user', 'gmail', 'upgrade@example.test', 1, 1);
+    INSERT INTO email_threads
+      (id, user_id, account_id, provider_thread_id, unread_count, created_at, updated_at)
+      VALUES ('upgrade-thread', 'local-user', 'upgrade-account', 'provider-thread', 2, 1, 1);
+    INSERT INTO email_messages
+      (id, user_id, account_id, thread_id, provider_message_id, sender_email,
+       sent_at, direction, body_clean_text, created_at, updated_at)
+      VALUES ('upgrade-message', 'local-user', 'upgrade-account', 'upgrade-thread',
+       'provider-message', 'client@example.test', 1, 'incoming', 'Keep this message', 1, 1);
+  `);
   baseline.db.close();
 
   const upgraded = bootstrapDatabase({
@@ -175,6 +188,19 @@ withTempDb((dbPath) => {
     }
   }
   pass('all expected tables present after upgrade');
+
+  const message = upgraded.db.prepare(
+    'SELECT body_clean_text, locally_read, provider_unread FROM email_messages WHERE id = ?',
+  ).get('upgrade-message');
+  const thread = upgraded.db.prepare(
+    'SELECT unread_count FROM email_threads WHERE id = ?',
+  ).get('upgrade-thread');
+  if (message?.body_clean_text !== 'Keep this message' || message.locally_read !== 0 ||
+      message.provider_unread !== null || thread?.unread_count !== 2) {
+    fail('message contents and unread counts changed during read-state migration');
+  } else {
+    pass('read-state migration preserves message contents and existing unread counts');
+  }
 
   upgraded.db.close();
 });

@@ -59,6 +59,9 @@ let shutdownComplete = false;
 let updaterConfigured = false;
 let lastUpdateInfo = null;
 let updatePollTimer = null;
+let gmailSyncTimer = null;
+let gmailBackgroundSync = null;
+let runtimeStopping = false;
 
 // How often to poll the update feed while the app is running.
 // Override with CHAI_UPDATE_POLL_MS for testing.
@@ -91,6 +94,40 @@ const refreshAgentResponseTasks = (reason) => {
   }
 };
 
+const syncConnector = async (connector) => {
+  const currentRuntime = requireRuntime();
+  if (runtimeStopping || shutdownStarted) return currentRuntime.getSnapshot();
+  broadcastEvent('chai:connector:event', { connector, type: 'sync.started' });
+  const result = await currentRuntime.connectorRuntime.syncNow(connector);
+  if (currentRuntime !== runtime) return runtime?.getSnapshot();
+  broadcastEvent('chai:connector:event', {
+    connector,
+    type: result.status === 'error' ? 'sync.failed' : 'sync.completed',
+    ...(result.status === 'error' ? { error: result.lastError } : {}),
+  });
+  if (result.status !== 'error') refreshAgentResponseTasks(`sync:${connector}`);
+  broadcastSnapshot();
+  return currentRuntime.getSnapshot();
+};
+
+// Gmail has no persistent socket like WhatsApp. Reconcile inbound labels on
+// startup, refocus, and once a minute, including while the window is closed.
+const syncGmailInBackground = () => {
+  if (runtimeStopping || shutdownStarted || runtime?.migrationFailure || !gmailConnector?.getStatus().connected) return;
+  if (gmailBackgroundSync) return gmailBackgroundSync;
+  gmailBackgroundSync = syncConnector('gmail').catch((error) => {
+    runtime?.logger.warn('background gmail sync failed', { error: String(error) });
+  }).finally(() => { gmailBackgroundSync = null; });
+  return gmailBackgroundSync;
+};
+
+const startGmailSync = () => {
+  if (gmailSyncTimer) return;
+  void syncGmailInBackground();
+  gmailSyncTimer = setInterval(() => { void syncGmailInBackground(); }, 60_000);
+  gmailSyncTimer.unref?.();
+};
+
 const createMainWindow = async () => {
   const win = new BrowserWindow({
     width: 1280,
@@ -109,6 +146,7 @@ const createMainWindow = async () => {
   win.once('ready-to-show', () => {
     win.show();
   });
+  win.on('focus', () => { void syncGmailInBackground(); });
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) {
@@ -161,26 +199,7 @@ const registerIpcHandlers = () => {
   });
 
   ipcMain.handle('chai:connector:sync', async (_event, connector) => {
-    broadcastEvent('chai:connector:event', {
-      connector,
-      type: 'sync.started',
-    });
-    try {
-      await requireRuntime().connectorRuntime.syncNow(connector);
-      broadcastEvent('chai:connector:event', {
-        connector,
-        type: 'sync.completed',
-      });
-      refreshAgentResponseTasks(`sync:${connector}`);
-    } catch (error) {
-      broadcastEvent('chai:connector:event', {
-        connector,
-        type: 'sync.failed',
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-    broadcastSnapshot();
-    return runtime.getSnapshot();
+    return syncConnector(connector);
   });
 
   ipcMain.handle('chai:gmail:list-threads', () => {
@@ -200,6 +219,16 @@ const registerIpcHandlers = () => {
       attachments: store.getEmailAttachmentsForMessage(message.id),
     }));
     return { thread, messages: messagesWithAttachments };
+  });
+
+  // Reading in Chai only updates its local mirror. Never modify Gmail labels.
+  ipcMain.handle('chai:gmail:mark-thread-read', (_event, threadId, messageIds) => {
+    if (!runtime || typeof threadId !== 'string' || !Array.isArray(messageIds)) return { ok: false };
+    const readerWindow = BrowserWindow.fromWebContents(_event.sender);
+    if (!readerWindow?.isFocused() || !readerWindow.isVisible() || readerWindow.isMinimized()) return { ok: false };
+    const store = createEmailStore(runtime.db);
+    store.markEmailThreadRead(threadId, messageIds.filter((id) => typeof id === 'string'));
+    return { ok: true };
   });
 
   ipcMain.handle('chai:gmail:send', async (_event, payload) => {
@@ -261,10 +290,13 @@ const registerIpcHandlers = () => {
     }));
   });
 
-  ipcMain.handle('chai:whatsapp:mark-chat-read', (_event, jid) => {
-    if (!runtime) return { ok: false };
+  ipcMain.handle('chai:whatsapp:mark-chat-read', (_event, jid, messageKeys) => {
+    if (!runtime || typeof jid !== 'string' || !Array.isArray(messageKeys)) return { ok: false };
+    const readerWindow = BrowserWindow.fromWebContents(_event.sender);
+    if (!readerWindow?.isFocused() || !readerWindow.isVisible() || readerWindow.isMinimized()) return { ok: false };
     const store = createWhatsAppStore(runtime.db);
-    store.markChatRead(jid);
+    // Acknowledge the rendered snapshot only; newer arrivals remain unread.
+    store.markChatRead(jid, messageKeys.filter((key) => typeof key === 'string'));
     return { ok: true };
   });
 
@@ -463,13 +495,20 @@ const registerIpcHandlers = () => {
   ipcMain.handle('chai:update:last', () => lastUpdateInfo);
 
   ipcMain.handle('chai:migration:retry', async () => {
-    await stopAgentBridge();
-    await whatsappConnector?.dispose();
-    runtime?.close();
-    runtime = await createRuntime();
-    rebuildWorkflowExtractor(runtime.settingsStore.read());
-    await startAgentBridge();
-    broadcastSnapshot();
+    runtimeStopping = true;
+    try {
+      await stopAgentBridge();
+      await runtime?.connectorRuntime.waitForIdle();
+      await whatsappConnector?.dispose();
+      runtime?.close();
+      runtime = await createRuntime();
+      rebuildWorkflowExtractor(runtime.settingsStore.read());
+      await startAgentBridge();
+      broadcastSnapshot();
+    } finally {
+      runtimeStopping = false;
+    }
+    void syncGmailInBackground();
     return runtime.getSnapshot();
   });
 };
@@ -727,6 +766,7 @@ const bootstrap = async () => {
   registerIpcHandlers();
   await createMainWindow();
   broadcastSnapshot();
+  startGmailSync();
 
   if (!isDev) {
     configureAutoUpdater();
@@ -800,9 +840,12 @@ if (!gotLock) {
     if (shutdownStarted) return;
     shutdownStarted = true;
     stopUpdatePolling();
+    if (gmailSyncTimer) clearInterval(gmailSyncTimer);
+    gmailSyncTimer = null;
     void (async () => {
       try {
         await stopAgentBridge();
+        await runtime?.connectorRuntime.waitForIdle();
         await whatsappConnector?.dispose();
         await workflowExtractor?.dispose();
       } catch (error) {

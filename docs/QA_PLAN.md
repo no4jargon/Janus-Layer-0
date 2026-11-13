@@ -46,6 +46,19 @@ Goal: every test below should be exercised on at least one macOS install **and**
 | 2.13 | Right-click cluster — N/A here | (not applicable in WhatsApp tab) |
 | 2.14 | Click **Disconnect** | Session wiped, "WhatsApp disconnected" line shown; subsequent **Connect** issues a fresh QR |
 
+### Read state and privacy
+
+| # | Step | Expected |
+|---|---|---|
+| 2.15 | Open an unread WhatsApp chat or Gmail thread in the focused Chai window | Chai's badge clears for loaded messages; WhatsApp sends no read receipt and Gmail keeps its provider labels |
+| 2.16 | Restart Chai or resync the same provider unread messages | Locally viewed messages stay cleared; existing messages and paired sessions remain intact |
+| 2.17 | Read a conversation on the phone or another provider client | WhatsApp badges update when provider read/app-state events arrive; Gmail reconciles on startup, focus, and every minute while connected |
+| 2.18 | Background/minimize Chai with a conversation open, then receive a new message | Its badge remains until Chai is visible and focused; an obscuring Settings/tutorial modal also prevents acknowledgement |
+| 2.19 | Switch chats quickly while the first chat is loading | The first response cannot replace or acknowledge the second chat; only rendered message IDs are acknowledged |
+| 2.20 | Receive a new message between loading the thread and acknowledging its displayed messages | The new message remains unread until its own rendered snapshot is acknowledged |
+| 2.21 | Open a thread containing an outgoing message whose recipient later reads it | Recipient read status never clears unrelated incoming unread messages |
+| 2.22 | Gmail: read an older mirrored thread outside the seven-day discovery window | Its badge clears on the next sync; expired history cursors trigger a metadata reconciliation of all mirrored threads |
+
 ## 3. Clusters
 
 | # | Step | Expected |

@@ -12,6 +12,7 @@ import {
   makeCacheableSignalKeyStore,
   makeWASocket,
   useMultiFileAuthState,
+  WAMessageStatus,
 } from 'baileys';
 import type {
   ChatUpdate,
@@ -248,7 +249,7 @@ export const createWhatsAppConnector = (
     const unread = providerUnreadCount(value);
     if (unread === undefined || unread === null) return;
     if (unread === 0) {
-      await adapter.markChatRead(jid);
+      await adapter.setChatUnread(jid, 0);
     } else if (unread > 0) {
       await adapter.incrementChatUnread(jid, unread);
     } else {
@@ -388,10 +389,14 @@ export const createWhatsAppConnector = (
     });
     activeSock = sock;
     const isCurrentSocket = () => isCurrentStart() && activeSock === sock;
+    // Baileys does not await process handlers. Preserve provider event order
+    // across asynchronous adapter writes (especially unread deltas/read clears).
+    let eventQueue = Promise.resolve();
 
     sock.ev.process((events) => {
       if (!isCurrentSocket()) return;
-      const task = (async () => {
+      const task = eventQueue.then(async () => {
+        if (!isCurrentSocket()) return;
         if (events['creds.update']) {
           await saveCreds();
         }
@@ -518,6 +523,18 @@ export const createWhatsAppConnector = (
             const key = messageKeyFromWAKey(update.key);
             const existing = await adapter.getMessage(key);
             if (!existing) continue;
+            // A READ/PLAYED update on an incoming message is our own read on
+            // another linked device. Recipient reads of outgoing messages
+            // never acknowledge this account's unread messages. The store
+            // applies this idempotently so replayed receipts cannot decrement
+            // a newer message's unread count.
+            if (
+              update.key.fromMe === false &&
+              typeof update.update.status === 'number' &&
+              update.update.status >= WAMessageStatus.READ
+            ) {
+              await adapter.markMessageRead(key);
+            }
             const text =
               update.update.message === null
                 ? '[This message was deleted]'
@@ -526,8 +543,11 @@ export const createWhatsAppConnector = (
                   existing.text;
             await adapter.updateMessage(key, {
               text,
-              status: update.update.status ?? existing.status,
-              isDeleted: update.update.message === null,
+              status:
+                !existing.fromMe && typeof existing.status === 'number'
+                  ? Math.max(existing.status, update.update.status ?? existing.status)
+                  : update.update.status ?? existing.status,
+              isDeleted: update.update.message === null || existing.isDeleted,
             });
             emit({
               type: 'message-update',
@@ -553,7 +573,8 @@ export const createWhatsAppConnector = (
             await adapter.markMessageDeleted(messageKey);
           }
         }
-      })();
+      });
+      eventQueue = task.catch(() => {});
       pendingEvents.add(task);
       return task.finally(() => pendingEvents.delete(task));
     });

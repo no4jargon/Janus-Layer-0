@@ -38,6 +38,7 @@ export type EmailMessageRecord = {
   threadId: string;
   providerMessageId: string;
   gmailHistoryId: string | null;
+  providerUnread?: boolean;
   senderName: string | null;
   senderEmail: string;
   toJson: string;

@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('chaiApi', {
     listThreads: () => ipcRenderer.invoke('chai:gmail:list-threads'),
     getThread: (threadId) =>
       ipcRenderer.invoke('chai:gmail:get-thread', threadId),
+    markThreadRead: (threadId, messageIds) =>
+      ipcRenderer.invoke('chai:gmail:mark-thread-read', threadId, messageIds),
     sendEmail: (payload) => ipcRenderer.invoke('chai:gmail:send', payload),
     downloadAttachment: (attachmentId) =>
       ipcRenderer.invoke('chai:gmail:download-attachment', attachmentId),
@@ -30,8 +32,8 @@ contextBridge.exposeInMainWorld('chaiApi', {
   whatsapp: {
     listChats: () => ipcRenderer.invoke('chai:whatsapp:list-chats'),
     getChat: (jid) => ipcRenderer.invoke('chai:whatsapp:get-chat', jid),
-    markChatRead: (jid) =>
-      ipcRenderer.invoke('chai:whatsapp:mark-chat-read', jid),
+    markChatRead: (jid, messageKeys) =>
+      ipcRenderer.invoke('chai:whatsapp:mark-chat-read', jid, messageKeys),
     sendText: (payload) =>
       ipcRenderer.invoke('chai:whatsapp:send', payload),
     getStatus: () => ipcRenderer.invoke('chai:whatsapp:status'),

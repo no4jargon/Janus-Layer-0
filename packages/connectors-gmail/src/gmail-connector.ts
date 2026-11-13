@@ -46,6 +46,19 @@ type GmailProfile = {
   lastSyncedAt?: string | null;
 };
 
+type GmailHistoryMessage = { threadId?: string };
+type GmailHistoryPage = {
+  historyId?: string;
+  nextPageToken?: string;
+  history?: Array<{
+    messages?: GmailHistoryMessage[];
+    messagesAdded?: Array<{ message?: GmailHistoryMessage }>;
+    messagesDeleted?: Array<{ message?: GmailHistoryMessage }>;
+    labelsAdded?: Array<{ message?: GmailHistoryMessage }>;
+    labelsRemoved?: Array<{ message?: GmailHistoryMessage }>;
+  }>;
+};
+
 export type GmailConnectorOptions = {
   keystoreDir: string;
   attachmentCacheDir: string;
@@ -159,6 +172,98 @@ export const createGmailConnector = (
     return ids;
   };
 
+  const listChangedThreadIds = async (token: GmailToken, cursor: string) => {
+    const threadIds = new Set<string>();
+    const contentThreadIds = new Set<string>();
+    let pageToken = '';
+    let historyId = cursor;
+    do {
+      const res = await authedFetch(token, gmailApi('history', {
+        startHistoryId: cursor,
+        maxResults: '500',
+        pageToken,
+      }));
+      // Gmail expires history cursors. Reconcile every mirrored thread before
+      // replacing the cursor, including threads outside the discovery window.
+      if (res.status === 404) return null;
+      const raw = await res.text();
+      if (!res.ok) throw new Error(`Failed Gmail history: ${raw}`);
+      const page = JSON.parse(raw) as GmailHistoryPage;
+      for (const change of page.history || []) {
+        const messages = [
+          ...(change.messages || []),
+          ...(change.messagesAdded || []).flatMap((item) => item.message ? [item.message] : []),
+          ...(change.messagesDeleted || []).flatMap((item) => item.message ? [item.message] : []),
+          ...(change.labelsAdded || []).flatMap((item) => item.message ? [item.message] : []),
+          ...(change.labelsRemoved || []).flatMap((item) => item.message ? [item.message] : []),
+        ];
+        for (const message of messages) {
+          if (message.threadId) threadIds.add(message.threadId);
+        }
+        // Label-only events need only a minimal fetch. Newly added messages
+        // need their bodies, even when the conversation was already mirrored.
+        for (const item of change.messagesAdded || []) {
+          if (item.message?.threadId) contentThreadIds.add(item.message.threadId);
+        }
+        if (!change.messagesAdded && !change.messagesDeleted && !change.labelsAdded && !change.labelsRemoved) {
+          for (const message of change.messages || []) {
+            if (message.threadId) contentThreadIds.add(message.threadId);
+          }
+        }
+      }
+      historyId = page.historyId || historyId;
+      pageToken = page.nextPageToken || '';
+    } while (pageToken);
+    return { threadIds, contentThreadIds, historyId };
+  };
+
+  const getHistoryBaseline = async (token: GmailToken): Promise<string> => {
+    const res = await authedFetch(token, gmailApi('profile'));
+    const raw = await res.text();
+    if (!res.ok) throw new Error(`Failed Gmail sync profile: ${raw}`);
+    const profile = JSON.parse(raw) as { historyId?: string };
+    if (!profile.historyId) throw new Error('Gmail sync profile has no history ID');
+    return profile.historyId;
+  };
+
+  const persistMessageReadFlags = (
+    threadId: string,
+    messages: Array<{ id?: string; labelIds?: string[] }>,
+  ) => {
+    const labelsById = new Map(messages.map((message) => [message.id, message.labelIds || []]));
+    for (const storedMessage of options.emailStore.getEmailMessagesForThread(threadId, Number.MAX_SAFE_INTEGER)) {
+      // A deleted message must stop contributing to the local-read overlay too.
+      const providerUnread = (labelsById.get(storedMessage.providerMessageId) || []).includes('UNREAD');
+      if (storedMessage.providerUnread === providerUnread) continue;
+      options.emailStore.upsertEmailMessage({ ...storedMessage, providerUnread, updatedAt: Date.now() });
+    }
+  };
+
+  const refreshThreadReadState = async (
+    token: GmailToken,
+    stored: ReturnType<EmailStore['getEmailThreads']>[number],
+  ) => {
+    // GET/minimal reads labels without changing Gmail's read state or fetching
+    // message bodies again. Opening a local thread never invokes modify APIs.
+    const res = await authedFetch(token, gmailApi(`threads/${stored.providerThreadId}`, {
+      format: 'minimal',
+    }));
+    const raw = await res.text();
+    if (!res.ok && res.status !== 404) {
+      throw new Error(`Failed Gmail thread read state ${stored.providerThreadId}: ${raw}`);
+    }
+    const messages = res.status === 404
+      ? []
+      : (JSON.parse(raw) as { messages?: Array<{ id?: string; labelIds?: string[] }> }).messages || [];
+    persistMessageReadFlags(stored.id, messages);
+    options.emailStore.upsertEmailThread({
+      ...stored,
+      unreadCount: messages.filter((message) => (message.labelIds || []).includes('UNREAD')).length,
+      sourceLabelsJson: JSON.stringify(messages.at(-1)?.labelIds || []),
+      updatedAt: Date.now(),
+    });
+  };
+
   const sync = async (): Promise<GmailSyncSummary> => {
     if (!status.connected) {
       throw new Error('Gmail not connected');
@@ -166,21 +271,37 @@ export const createGmailConnector = (
     status.lastSyncStatus = 'syncing';
     status.lastSyncError = null;
 
-    const token = await getFreshToken();
-    const account = options.emailStore.getEmailAccount('local-user', 'gmail');
-    if (!account) throw new Error('Gmail account record not found');
-
     try {
+      const token = await getFreshToken();
+      const account = options.emailStore.getEmailAccount('local-user', 'gmail');
+      if (!account) throw new Error('Gmail account record not found');
       const selfEmail = account.emailAddress;
       options.logger.info('gmail sync started', { selfEmail });
-      const threadIds = await listRecentThreadIds(token);
+      const history = account.syncCursor
+        ? await listChangedThreadIds(token, account.syncCursor)
+        : null;
+      // Capture the baseline before reading threads so a concurrent label change
+      // is still returned by the next history sync.
+      const nextCursor = history?.historyId || await getHistoryBaseline(token);
+      const mirroredThreads = options.emailStore
+        .getEmailThreads('local-user', Number.MAX_SAFE_INTEGER)
+        .filter((thread) => thread.accountId === account.id);
+      const mirroredThreadIds = new Set(mirroredThreads.map((thread) => thread.providerThreadId));
+      const threadIds = new Set(await listRecentThreadIds(token));
+      for (const threadId of history?.contentThreadIds || []) {
+        if (mirroredThreadIds.has(threadId)) threadIds.add(threadId);
+      }
       options.logger.info('gmail sync fetched thread ids', {
-        count: threadIds.length,
+        count: threadIds.size,
       });
       let upsertedThreads = 0;
       let upsertedMessages = 0;
+      const refreshedThreadIds = new Set<string>();
 
       for (const providerThreadId of threadIds) {
+        if (history && mirroredThreadIds.has(providerThreadId) && !history.contentThreadIds.has(providerThreadId)) {
+          continue;
+        }
         const thread = await fetchThread(providerThreadId, token);
         const messages = (thread.messages || []).sort(
           (a, b) => Number(a.internalDate || 0) - Number(b.internalDate || 0),
@@ -249,6 +370,8 @@ export const createGmailConnector = (
         const threadId = `gmail_thread_${providerThreadId}`;
         const now = Date.now();
 
+        persistMessageReadFlags(threadId, messages);
+
         options.emailStore.upsertEmailThread({
           id: threadId,
           userId: 'local-user',
@@ -271,6 +394,7 @@ export const createGmailConnector = (
           updatedAt: now,
         });
         upsertedThreads += 1;
+        refreshedThreadIds.add(providerThreadId);
 
         for (const item of processed) {
           const messageId = `gmail_msg_${item.providerMessageId}`;
@@ -293,6 +417,7 @@ export const createGmailConnector = (
             bodyCleanText: item.bodyCleanText,
             hasAttachments: item.hasAttachments ? 1 : 0,
             isHiddenAutomated: item.isAutomated && !hasHumanSignal ? 1 : 0,
+            providerUnread: item.labelIds.includes('UNREAD'),
             createdAt: now,
             updatedAt: now,
           });
@@ -316,10 +441,16 @@ export const createGmailConnector = (
         }
       }
 
+      for (const stored of mirroredThreads) {
+        if (refreshedThreadIds.has(stored.providerThreadId)) continue;
+        if (history && !history.threadIds.has(stored.providerThreadId)) continue;
+        await refreshThreadReadState(token, stored);
+      }
+
       const completedAt = Date.now();
       options.emailStore.updateEmailAccountSync(
         account.id,
-        account.syncCursor,
+        nextCursor,
         completedAt,
       );
 

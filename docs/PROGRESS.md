@@ -1,7 +1,7 @@
 # Productization Progress Tracker
 
 Status: active
-Last updated: 2026-10-15
+Last updated: 2026-10-30
 Scope tracked here: desktop-first, local-first freelancer communications workspace.
 
 ## Overall status
@@ -117,6 +117,15 @@ Status: code complete (diagnostics, updater download/install, required + optiona
 - Desktop and WhatsApp connector dependencies now pin Baileys `7.0.0-rc12`, the minimum patched v7 release for [GHSA-qvv5-jq5g-4cgg / CVE-2026-48063](https://github.com/WhiskeySockets/Baileys/security/advisories/GHSA-qvv5-jq5g-4cgg). The prior `7.0.0-rc.9` was affected by message/history spoofing and app-state corruption. No connector API compatibility edits were needed.
 - Validation passed: workspace `pnpm typecheck`, UI production build, seven WhatsApp-store tests, three agent-bridge tests, synthetic local-SVG rendering, and a patched-Baileys export/group-JID smoke check without connecting.
 - These repairs first landed locally. They are now included in published `v0.1.13`; later installed-app and transport acceptance is recorded below.
+
+## Local read state and inbound read sync — 2026-10-30
+
+- Opening WhatsApp/Gmail conversations acknowledges only the displayed message IDs locally, after rendering in a focused, visible, unobscured window. Local reads persist across restarts and provider replays; background arrivals, stale thread responses, and newer unrendered messages retain their unread badges. The header explains that no read receipts are sent.
+- Migration `008_local_read_state` adds local message acknowledgements, mirrored Gmail UNREAD flags, and a local acknowledgement for WhatsApp's manual unread marker. Provider unread counts remain separate. WhatsApp incoming READ/PLAYED status and its unread adjustment commit atomically; delayed/duplicate receipts and recipient reads of outbound messages cannot consume newer incoming unread counts.
+- WhatsApp consumes provider chat read clears and inbound read-status updates without calling `readMessages` or `chatModify`. Missing/neutral provider counts are preserved rather than guessed; cross-device freshness depends on WhatsApp delivering its read/app-state events.
+- Gmail now consumes paginated history including label-only changes, reconciles older mirrored threads on initial/expired history, and updates read flags with GET-only metadata requests. Connected accounts sync on startup, window focus, and every minute. Unchanged threads skip body downloads. Connector sync calls coalesce, disconnect waits for active writes, and shutdown/retry drain pending operations before closing SQLite.
+- Validation passed: workspace build/typecheck; 27 DB, 7 runtime, 8 Gmail, 12 WhatsApp, 11 bridge, 6 prompt, and 21 notification-helper tests; fresh/idempotent/upgrade migrations and data-path checks. Isolated browser/IPC smoke tests covered both channel opens, background/refocus, stale payloads, modal overlays, native window guards, and automatic Gmail sync. Focus/visibility were simulated; live cross-device account acceptance remains pending.
+- Built and inspected the local unsigned macOS ARM64 app at `apps/desktop/dist/mac-arm64/Chai.app`. This feature has not been installed over `/Applications/Chai.app` or published; the public beta remains v0.1.13.
 
 ## Current problems / risks
 

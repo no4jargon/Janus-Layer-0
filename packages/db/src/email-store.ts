@@ -10,6 +10,25 @@ import type {
 
 const num = (value: unknown): number => Number(value ?? 0);
 
+// Keep provider counts separate from local viewing. Until old messages have
+// been refreshed with their labels, use the newest N messages as
+// candidates for the provider's N unread messages.
+const localReadsCte = `WITH unread_messages AS (
+  SELECT thread_id, locally_read,
+    ROW_NUMBER() OVER (
+      PARTITION BY thread_id ORDER BY sent_at DESC, rowid DESC
+    ) AS unread_rank
+  FROM email_messages WHERE provider_unread IS NOT 0
+), local_reads AS (
+  SELECT m.thread_id, SUM(m.locally_read) AS read_count
+  FROM unread_messages m JOIN email_threads t ON t.id = m.thread_id
+  WHERE m.unread_rank <= t.unread_count GROUP BY m.thread_id
+)`;
+
+const effectiveUnreadSql = `MAX(0, unread_count - COALESCE(
+  (SELECT read_count FROM local_reads WHERE local_reads.thread_id = email_threads.id), 0
+)) AS unread_count`;
+
 const mapThreadRow = (row: any): EmailThreadRecord => ({
   id: row.id,
   userId: row.user_id,
@@ -34,6 +53,7 @@ const mapMessageRow = (row: any): EmailMessageRecord => ({
   threadId: row.thread_id,
   providerMessageId: row.provider_message_id,
   gmailHistoryId: row.gmail_history_id,
+  providerUnread: row.provider_unread == null ? undefined : num(row.provider_unread) === 1,
   senderName: row.sender_name,
   senderEmail: row.sender_email,
   toJson: row.to_json,
@@ -173,12 +193,12 @@ export const createEmailStore = (db: Database) => {
       INSERT INTO email_messages (
         id, user_id, account_id, thread_id, provider_message_id, gmail_history_id,
         sender_name, sender_email, to_json, cc_json, sent_at, direction, snippet,
-        body_raw_html, body_raw_text, body_clean_text, has_attachments, is_hidden_automated, created_at, updated_at
+        body_raw_html, body_raw_text, body_clean_text, has_attachments, is_hidden_automated, created_at, updated_at, provider_unread
       )
       VALUES (
         @id, @userId, @accountId, @threadId, @providerMessageId, @gmailHistoryId,
         @senderName, @senderEmail, @toJson, @ccJson, @sentAt, @direction, @snippet,
-        @bodyRawHtml, @bodyRawText, @bodyCleanText, @hasAttachments, @isHiddenAutomated, @createdAt, @updatedAt
+        @bodyRawHtml, @bodyRawText, @bodyCleanText, @hasAttachments, @isHiddenAutomated, @createdAt, @updatedAt, @providerUnread
       )
       ON CONFLICT(id) DO UPDATE SET
         sender_name = excluded.sender_name,
@@ -193,9 +213,31 @@ export const createEmailStore = (db: Database) => {
         body_clean_text = COALESCE(excluded.body_clean_text, email_messages.body_clean_text),
         has_attachments = excluded.has_attachments,
         is_hidden_automated = excluded.is_hidden_automated,
+        provider_unread = COALESCE(excluded.provider_unread, email_messages.provider_unread),
+        locally_read = CASE
+          WHEN email_messages.provider_unread = 0 AND excluded.provider_unread = 1 THEN 0
+          ELSE email_messages.locally_read
+        END,
         updated_at = excluded.updated_at
       `,
-    ).run(row);
+    ).run({
+      ...row,
+      providerUnread: row.providerUnread === undefined ? null : row.providerUnread ? 1 : 0,
+    });
+  };
+
+  const markEmailThreadRead = (threadId: string, messageIds: string[]) => {
+    const mark = db.prepare(`UPDATE email_messages SET locally_read = 1
+      WHERE thread_id = ? AND id = ? AND locally_read = 0`);
+    db.exec('SAVEPOINT email_local_read');
+    try {
+      for (const id of messageIds) mark.run(threadId, id);
+      db.exec('RELEASE email_local_read');
+    } catch (error) {
+      db.exec('ROLLBACK TO email_local_read');
+      db.exec('RELEASE email_local_read');
+      throw error;
+    }
   };
 
   const upsertEmailAttachment = (
@@ -232,8 +274,9 @@ export const createEmailStore = (db: Database) => {
   const getEmailThreads = (userId: string, limit = 250): EmailThreadRecord[] => {
     const rows = db
       .prepare(
-        `SELECT id, user_id, account_id, provider_thread_id, derived_thread_key, subject, participant_summary,
-                last_message_at, last_cleaned_preview, unread_count, has_attachments, source_labels_json, created_at, updated_at
+        `${localReadsCte}
+         SELECT id, user_id, account_id, provider_thread_id, derived_thread_key, subject, participant_summary,
+                last_message_at, last_cleaned_preview, ${effectiveUnreadSql}, has_attachments, source_labels_json, created_at, updated_at
          FROM email_threads
          WHERE user_id = ?
          ORDER BY last_message_at DESC
@@ -247,8 +290,9 @@ export const createEmailStore = (db: Database) => {
   const getEmailThreadById = (threadId: string): EmailThreadRecord | null => {
     const row = db
       .prepare(
-        `SELECT id, user_id, account_id, provider_thread_id, derived_thread_key, subject, participant_summary,
-                last_message_at, last_cleaned_preview, unread_count, has_attachments, source_labels_json, created_at, updated_at
+        `${localReadsCte}
+         SELECT id, user_id, account_id, provider_thread_id, derived_thread_key, subject, participant_summary,
+                last_message_at, last_cleaned_preview, ${effectiveUnreadSql}, has_attachments, source_labels_json, created_at, updated_at
          FROM email_threads WHERE id = ? LIMIT 1`,
       )
       .get(threadId) as any;
@@ -265,7 +309,7 @@ export const createEmailStore = (db: Database) => {
         `SELECT id, user_id, account_id, thread_id, provider_message_id, gmail_history_id,
                 sender_name, sender_email, to_json, cc_json, sent_at, direction,
                 snippet, body_raw_html, body_raw_text, body_clean_text,
-                has_attachments, is_hidden_automated, created_at, updated_at
+                has_attachments, is_hidden_automated, created_at, updated_at, provider_unread
          FROM email_messages
          WHERE thread_id = ?
          ORDER BY sent_at ASC, created_at ASC
@@ -284,7 +328,7 @@ export const createEmailStore = (db: Database) => {
         `SELECT id, user_id, account_id, thread_id, provider_message_id, gmail_history_id,
                 sender_name, sender_email, to_json, cc_json, sent_at, direction,
                 snippet, body_raw_html, body_raw_text, body_clean_text,
-                has_attachments, is_hidden_automated, created_at, updated_at
+                has_attachments, is_hidden_automated, created_at, updated_at, provider_unread
          FROM email_messages WHERE id = ? LIMIT 1`,
       )
       .get(messageId) as any;
@@ -432,6 +476,7 @@ export const createEmailStore = (db: Database) => {
     clearEmailDataForAccount,
     upsertEmailThread,
     upsertEmailMessage,
+    markEmailThreadRead,
     upsertEmailAttachment,
     markEmailAttachmentCached,
     getEmailThreads,

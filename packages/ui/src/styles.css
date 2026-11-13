@@ -491,6 +491,13 @@ body {
 	margin-left: auto;
 }
 
+.thread-read-privacy {
+	color: #667781;
+	font-size: 11px;
+	align-self: center;
+	white-space: nowrap;
+}
+
 .thread-header-icon-btn {
 	width: 36px;
 	height: 36px;

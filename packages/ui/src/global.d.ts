@@ -234,6 +234,7 @@ declare global {
           thread: EmailThreadSummary;
           messages: EmailMessageSummary[];
         } | null>;
+        markThreadRead: (threadId: string, messageIds: string[]) => Promise<{ ok: boolean }>;
         sendEmail: (payload: {
           clientRequestId: string;
           threadId?: string | null;
@@ -251,7 +252,7 @@ declare global {
       whatsapp: {
         listChats: () => Promise<WaChatSummary[]>;
         getChat: (jid: string) => Promise<WaMessageSummary[]>;
-        markChatRead: (jid: string) => Promise<{ ok: boolean }>;
+        markChatRead: (jid: string, messageKeys: string[]) => Promise<{ ok: boolean }>;
         sendText: (payload: {
           jid: string;
           text: string;

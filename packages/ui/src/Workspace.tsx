@@ -246,6 +246,13 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
     'No conversation selected',
   );
   const [threadMessages, setThreadMessages] = useState<ThreadMessage[]>([]);
+  const [loadedThreadKey, setLoadedThreadKey] = useState<string | null>(null);
+  const activeThreadRef = useRef(activeThread);
+  activeThreadRef.current = activeThread;
+  const threadRequestVersionRef = useRef(0);
+  const waListRequestVersionRef = useRef(0);
+  const emailListRequestVersionRef = useRef(0);
+  const [windowAttention, setWindowAttention] = useState(0);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [selectedMessageKeys, setSelectedMessageKeys] = useState<Set<string>>(
     new Set(),
@@ -375,7 +382,9 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
 
   const loadWhatsappChats = useCallback(async () => {
     if (!window.chaiApi) return;
+    const requestedVersion = ++waListRequestVersionRef.current;
     const chats = await window.chaiApi.whatsapp.listChats();
+    if (requestedVersion !== waListRequestVersionRef.current) return;
     setWhatsappChats(chats.map(toListItemWhatsapp));
   }, []);
 
@@ -403,7 +412,9 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
 
   const loadEmailThreads = useCallback(async () => {
     if (!window.chaiApi) return;
+    const requestedVersion = ++emailListRequestVersionRef.current;
     const threads = await window.chaiApi.gmail.listThreads();
+    if (requestedVersion !== emailListRequestVersionRef.current) return;
     setEmailThreads(threads.map(toListItemEmail));
   }, []);
 
@@ -422,26 +433,27 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
 
   const loadWhatsappThread = useCallback(async (jid: string) => {
     if (!window.chaiApi) return;
+    if (activeThreadRef.current?.sourceType !== 'whatsapp_chat' || activeThreadRef.current.id !== jid) return;
+    const requestedVersion = ++threadRequestVersionRef.current;
     const messages = await window.chaiApi.whatsapp.getChat(jid);
+    const current = activeThreadRef.current;
+    if (requestedVersion !== threadRequestVersionRef.current || current?.sourceType !== 'whatsapp_chat' || current.id !== jid) return;
     setThreadMessages(
       messages.map((message) => ({ ...message, __kind: 'whatsapp' }) as WaThreadMessage),
     );
+    setLoadedThreadKey(itemKey(current));
   }, []);
-
-  const markWhatsappChatRead = useCallback(
-    async (jid: string) => {
-      if (!window.chaiApi) return;
-      await window.chaiApi.whatsapp.markChatRead(jid);
-      await loadWhatsappChats();
-    },
-    [loadWhatsappChats],
-  );
 
   const loadEmailThread = useCallback(async (threadId: string) => {
     if (!window.chaiApi) return;
+    if (activeThreadRef.current?.sourceType !== 'email_thread' || activeThreadRef.current.id !== threadId) return;
+    const requestedVersion = ++threadRequestVersionRef.current;
     const payload = await window.chaiApi.gmail.getThread(threadId);
+    const current = activeThreadRef.current;
+    if (requestedVersion !== threadRequestVersionRef.current || current?.sourceType !== 'email_thread' || current.id !== threadId) return;
     if (!payload) {
       setThreadMessages([]);
+      setLoadedThreadKey(null);
       return;
     }
     const messages = (
@@ -450,11 +462,17 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
       >
     ).map((message) => ({ ...message, __kind: 'email' }) as EmailThreadMessage);
     setThreadMessages(messages);
+    setLoadedThreadKey(itemKey(current));
   }, []);
 
   const openThread = useCallback(
-    async (item: ListItem) => {
-      setActiveThread({ sourceType: item.sourceType, id: item.id });
+    (item: ListItem) => {
+      const nextThread = { sourceType: item.sourceType, id: item.id };
+      activeThreadRef.current = nextThread;
+      ++threadRequestVersionRef.current;
+      setActiveThread(nextThread);
+      setThreadMessages([]);
+      setLoadedThreadKey(null);
       setActiveThreadTitle(
         item.sourceType === 'email_thread'
           ? `${item.title}\n${item.subtitle}`
@@ -462,14 +480,8 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
       );
       setMobileThreadOpen(true);
       setSelectedMessageKeys(new Set());
-      if (item.sourceType === 'whatsapp_chat') {
-        await loadWhatsappThread(item.id);
-        await markWhatsappChatRead(item.id);
-      } else {
-        await loadEmailThread(item.id);
-      }
     },
-    [loadEmailThread, loadWhatsappThread, markWhatsappChatRead],
+    [],
   );
 
   // Initial load
@@ -524,6 +536,50 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
     }
   }, [activeThread, loadEmailThread, loadWhatsappThread]);
 
+  useEffect(() => {
+    const onAttention = () => setWindowAttention((version) => version + 1);
+    window.addEventListener('focus', onAttention);
+    document.addEventListener('visibilitychange', onAttention);
+    return () => {
+      window.removeEventListener('focus', onAttention);
+      document.removeEventListener('visibilitychange', onAttention);
+    };
+  }, []);
+
+  // A loaded conversation can update while the app is in the background. Only
+  // acknowledge the messages after they render in the focused, visible window.
+  // Passing their IDs also prevents a newer arrival from being cleared by an
+  // acknowledgement of an older snapshot. Neither IPC sends provider receipts.
+  useEffect(() => {
+    if (!activeThread || loadedThreadKey !== itemKey(activeThread) || !threadMessages.length) return;
+    if (settingsOpen || freemiumModalOpen || cheatModalOpen || gmailPreflightOpen || promptState || connectOverlay || !snapshot.settings.tutorialCompleted) return;
+    const thread = activeThread;
+    const frame = window.requestAnimationFrame(() => {
+      const current = activeThreadRef.current;
+      if (!window.chaiApi || !current || itemKey(current) !== loadedThreadKey) return;
+      if (document.visibilityState !== 'visible' || !document.hasFocus()) return;
+      if (!threadElRef.current?.getClientRects().length || document.querySelector('[aria-modal="true"]')) return;
+      void (async () => {
+        try {
+          if (thread.sourceType === 'whatsapp_chat') {
+            const keys = threadMessages.flatMap((message) => message.__kind === 'whatsapp' ? [message.messageKey] : []);
+            if (!keys.length) return;
+            const result = await window.chaiApi!.whatsapp.markChatRead(thread.id, keys);
+            if (result.ok) await loadWhatsappChats();
+          } else {
+            const ids = threadMessages.flatMap((message) => message.__kind === 'email' ? [message.id] : []);
+            if (!ids.length) return;
+            const result = await window.chaiApi!.gmail.markThreadRead(thread.id, ids);
+            if (result.ok) await loadEmailThreads();
+          }
+        } catch {
+          // Keep the unread badge on failure; a later focus or load retries it.
+        }
+      })();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeThread, loadedThreadKey, threadMessages, windowAttention, mobileThreadOpen, settingsOpen, freemiumModalOpen, cheatModalOpen, gmailPreflightOpen, promptState, connectOverlay, snapshot.settings.tutorialCompleted, loadWhatsappChats, loadEmailThreads]);
+
   // Stick thread to bottom when messages change
   useEffect(() => {
     if (!threadElRef.current) return;
@@ -568,19 +624,13 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
             event.payload.remoteJid === activeThread.id
           ) {
             await loadWhatsappThread(activeThread.id);
-            if (
-              event.type === 'chat-update' ||
-              event.type === 'message-upsert'
-            ) {
-              await markWhatsappChatRead(activeThread.id);
-            }
           }
         })();
       } else if (event.type === 'history-loaded') {
         void loadWhatsappChats();
       }
     },
-    [activeThread, loadWhatsappChats, loadWhatsappThread, markWhatsappChatRead],
+    [activeThread, loadWhatsappChats, loadWhatsappThread],
   );
   useWhatsAppEvents(onWaEvent);
 
@@ -590,9 +640,11 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
       if (event.connector !== 'gmail') return;
       if (event.type === 'sync.completed') {
         void loadEmailThreads();
+        const current = activeThreadRef.current;
+        if (current?.sourceType === 'email_thread') void loadEmailThread(current.id);
       }
     },
-    [loadEmailThreads],
+    [loadEmailThreads, loadEmailThread],
   );
   useConnectorEvents(onConnectorEvent);
 
@@ -836,8 +888,10 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
     await window.chaiApi.disconnectConnector('gmail');
     setEmailThreads([]);
     if (activeThread?.sourceType === 'email_thread') {
+      activeThreadRef.current = null;
       setActiveThread(null);
       setThreadMessages([]);
+      setLoadedThreadKey(null);
       setActiveThreadTitle('No conversation selected');
     }
   }, [activeThread]);
@@ -865,8 +919,10 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
     await window.chaiApi.disconnectConnector('whatsapp');
     setWhatsappChats([]);
     if (activeThread?.sourceType === 'whatsapp_chat') {
+      activeThreadRef.current = null;
       setActiveThread(null);
       setThreadMessages([]);
+      setLoadedThreadKey(null);
       setActiveThreadTitle('No conversation selected');
     }
   }, [activeThread]);
@@ -1486,6 +1542,12 @@ export const Workspace = ({ snapshot, updateInfo }: Props) => {
           <h2>{activeThreadTitle}</h2>
           {activeThread ? (
             <div className="thread-header-actions">
+              <span
+                className="thread-read-privacy"
+                title="Reading clears badges only in Chai. No read receipts are sent. Reads from your other apps sync here."
+              >
+                No read receipts
+              </span>
               <button
                 className="thread-header-icon-btn"
                 aria-label="Video call (coming soon)"

@@ -61,6 +61,8 @@ export type ConnectorRuntimeInput = {
 
 export const createConnectorRuntime = (input: ConnectorRuntimeInput) => {
   const state = new Map<ConnectorKind, ConnectorSnapshot>();
+  const pendingSyncs = new Map<ConnectorKind, Promise<ConnectorSnapshot>>();
+  const pendingDisconnects = new Map<ConnectorKind, Promise<ConnectorSnapshot>>();
 
   const seedDefaults = () => {
     for (const kind of KINDS) {
@@ -179,53 +181,81 @@ export const createConnectorRuntime = (input: ConnectorRuntimeInput) => {
     }
   };
 
-  const disconnect = async (kind: ConnectorKind): Promise<ConnectorSnapshot> => {
-    const connector = requireConnector(kind);
-    input.logger.info('connector disconnect requested', { connector: kind });
+  const disconnect = (kind: ConnectorKind): Promise<ConnectorSnapshot> => {
+    const pending = pendingDisconnects.get(kind);
+    if (pending) return pending;
 
-    try {
-      await connector.disconnect();
-      return update(kind, {
-        status: 'disconnected',
-        lastError: null,
-        lastSyncedAt: null,
-        metadata: null,
-      });
-    } catch (error) {
-      input.logger.error('connector disconnect failed', {
-        connector: kind,
-        error: String(error),
-      });
-      return update(kind, {
-        status: 'error',
-        lastError: error instanceof Error ? error.message : String(error),
-      });
-    }
+    // Register the disconnect before yielding. A timer or manual sync arriving
+    // while it waits must not start another write into the account being erased.
+    const operation = Promise.resolve().then(async () => {
+      const connector = requireConnector(kind);
+      input.logger.info('connector disconnect requested', { connector: kind });
+
+      try {
+        await pendingSyncs.get(kind);
+        await connector.disconnect();
+        return update(kind, {
+          status: 'disconnected',
+          lastError: null,
+          lastSyncedAt: null,
+          metadata: null,
+        });
+      } catch (error) {
+        input.logger.error('connector disconnect failed', {
+          connector: kind,
+          error: String(error),
+        });
+        return update(kind, {
+          status: 'error',
+          lastError: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }).finally(() => { pendingDisconnects.delete(kind); });
+    pendingDisconnects.set(kind, operation);
+    return operation;
   };
 
-  const syncNow = async (kind: ConnectorKind): Promise<ConnectorSnapshot> => {
-    const connector = requireConnector(kind);
-    input.logger.info('connector sync requested', { connector: kind });
-    update(kind, { status: 'syncing', lastError: null });
+  const syncNow = (kind: ConnectorKind): Promise<ConnectorSnapshot> => {
+    const disconnecting = pendingDisconnects.get(kind);
+    if (disconnecting) return disconnecting;
+    const pending = pendingSyncs.get(kind);
+    if (pending) return pending;
 
-    try {
-      const result = await connector.sync();
-      return update(kind, {
-        status: 'connected',
-        lastError: null,
-        lastSyncedAt: result.lastSyncedAt ?? nowIso(),
-        metadata: result.metadata ?? state.get(kind)?.metadata ?? null,
-      });
-    } catch (error) {
-      input.logger.error('connector sync failed', {
-        connector: kind,
-        error: String(error),
-      });
-      return update(kind, {
-        status: 'error',
-        lastError: error instanceof Error ? error.message : String(error),
-      });
-    }
+    const operation = Promise.resolve().then(async () => {
+      const connector = requireConnector(kind);
+      input.logger.info('connector sync requested', { connector: kind });
+      update(kind, { status: 'syncing', lastError: null });
+
+      try {
+        const result = await connector.sync();
+        return update(kind, {
+          status: 'connected',
+          lastError: null,
+          lastSyncedAt: result.lastSyncedAt ?? nowIso(),
+          metadata: result.metadata ?? state.get(kind)?.metadata ?? null,
+        });
+      } catch (error) {
+        input.logger.error('connector sync failed', {
+          connector: kind,
+          error: String(error),
+        });
+        return update(kind, {
+          status: 'error',
+          lastError: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }).finally(() => { pendingSyncs.delete(kind); });
+    pendingSyncs.set(kind, operation);
+    return operation;
+  };
+
+  // Callers stop accepting new operations before draining, then may safely
+  // close the stores used by both connector sync and disconnect cleanup.
+  const waitForIdle = async (): Promise<void> => {
+    await Promise.allSettled([
+      ...pendingSyncs.values(),
+      ...pendingDisconnects.values(),
+    ]);
   };
 
   loadFromStore();
@@ -236,6 +266,7 @@ export const createConnectorRuntime = (input: ConnectorRuntimeInput) => {
     connect,
     disconnect,
     syncNow,
+    waitForIdle,
   };
 };
 

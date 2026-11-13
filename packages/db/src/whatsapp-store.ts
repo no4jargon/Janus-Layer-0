@@ -175,7 +175,11 @@ export const createWhatsAppStore = (db: Database) => {
         WHEN excluded.message_timestamp >= wa_messages.message_timestamp THEN excluded.text
         ELSE wa_messages.text
       END,
-      status = COALESCE(excluded.status, wa_messages.status),
+      status = CASE
+        WHEN excluded.status IS NULL THEN wa_messages.status
+        WHEN wa_messages.status IS NULL THEN excluded.status
+        ELSE MAX(wa_messages.status, excluded.status)
+      END,
       is_deleted = CASE WHEN excluded.is_deleted = 1 THEN 1 ELSE wa_messages.is_deleted END,
       media_type = COALESCE(excluded.media_type, wa_messages.media_type),
       media_mime = COALESCE(excluded.media_mime, wa_messages.media_mime),
@@ -192,7 +196,11 @@ export const createWhatsAppStore = (db: Database) => {
     UPDATE wa_messages
     SET
       text = COALESCE(@text, text),
-      status = COALESCE(@status, status),
+      status = CASE
+        WHEN @status IS NULL THEN status
+        WHEN status IS NULL THEN @status
+        ELSE MAX(status, @status)
+      END,
       is_deleted = CASE WHEN @isDeleted IS NOT NULL THEN @isDeleted ELSE is_deleted END,
       media_type = COALESCE(@mediaType, media_type),
       media_mime = COALESCE(@mediaMime, media_mime),
@@ -284,11 +292,66 @@ export const createWhatsAppStore = (db: Database) => {
     });
   };
 
-  const markChatRead = (jid: string) => {
-    setChatUnread(jid, 0);
+  const markChatRead = (jid: string, messageKeys?: string[]) => {
+    // Acknowledge the displayed snapshot only: a message arriving between the
+    // renderer fetch and this call must remain unread.
+    const mark = db.prepare(`UPDATE wa_messages SET locally_read = 1
+      WHERE remote_jid = ? AND message_key = ? AND from_me = 0 AND locally_read = 0`);
+    const keys = messageKeys ?? getMessagesForChat(jid, Number.MAX_SAFE_INTEGER)
+      .map((message) => message.messageKey);
+    db.exec('SAVEPOINT wa_local_read');
+    try {
+      for (const key of keys) mark.run(jid, key);
+      const latest = db.prepare(`SELECT message_key, message_timestamp FROM wa_messages
+        WHERE remote_jid = ? ORDER BY message_timestamp DESC, rowid DESC LIMIT 1`)
+        .get(jid) as { message_key: string; message_timestamp: number } | undefined;
+      if (latest && keys.includes(latest.message_key)) {
+        db.prepare(`UPDATE wa_chats SET locally_read_marker_key = ?
+          WHERE jid = ? AND last_message_ts <= ?`)
+          .run(latest.message_key, jid, latest.message_timestamp);
+      }
+      db.exec('RELEASE wa_local_read');
+    } catch (error) {
+      db.exec('ROLLBACK TO wa_local_read');
+      db.exec('RELEASE wa_local_read');
+      throw error;
+    }
+  };
+
+  const markMessageRead = (messageKey: string) => {
+    // Only an inbound provider receipt reaches this method. Local viewing
+    // never changes WhatsApp delivery/read statuses.
+    const message = getMessage(messageKey);
+    if (!message || message.fromMe || (message.status ?? 0) >= 4) return;
+    db.exec('SAVEPOINT wa_provider_read');
+    try {
+      const chat = db.prepare('SELECT unread FROM wa_chats WHERE jid = ?')
+        .get(message.remoteJid) as { unread: number } | undefined;
+      const counted = chat && db.prepare(`SELECT 1 FROM (
+        SELECT message_key FROM wa_messages
+        WHERE remote_jid = ? AND from_me = 0 AND COALESCE(status, 0) < 4
+        ORDER BY message_timestamp DESC, rowid DESC LIMIT ?
+      ) WHERE message_key = ?`).get(message.remoteJid, chat.unread, messageKey);
+      db.prepare('UPDATE wa_messages SET status = 4, updated_at = ? WHERE message_key = ?')
+        .run(Date.now(), messageKey);
+      // A delayed receipt for an older, already-cleared message must not consume
+      // the unread count of a newer message. Commit status and count together so
+      // a failed write can be retried without losing the receipt's decrement.
+      if (counted) {
+        db.prepare('UPDATE wa_chats SET unread = MAX(0, unread - 1), updated_at = ? WHERE jid = ?')
+          .run(Date.now(), message.remoteJid);
+      }
+      db.exec('RELEASE wa_provider_read');
+    } catch (error) {
+      db.exec('ROLLBACK TO wa_provider_read');
+      db.exec('RELEASE wa_provider_read');
+      throw error;
+    }
   };
 
   const markChatUnread = (jid: string) => {
+    db.prepare('UPDATE wa_messages SET locally_read = 0 WHERE remote_jid = ?').run(jid);
+    db.prepare('UPDATE wa_chats SET locally_read_marker_key = NULL WHERE jid = ?').run(jid);
     markChatUnreadStmt.run({
       jid,
       updatedAt: Date.now(),
@@ -385,7 +448,18 @@ export const createWhatsAppStore = (db: Database) => {
   const getChats = (limit = 250): WaChatRecord[] => {
     const rows = db
       .prepare(
-        `SELECT
+        `WITH unread_messages AS (
+           SELECT remote_jid, locally_read,
+             ROW_NUMBER() OVER (
+               PARTITION BY remote_jid ORDER BY message_timestamp DESC, rowid DESC
+             ) AS unread_rank
+           FROM wa_messages WHERE from_me = 0 AND COALESCE(status, 0) < 4
+         ), local_reads AS (
+           SELECT m.remote_jid, SUM(m.locally_read) AS read_count, COUNT(*) AS pending_count
+           FROM unread_messages m JOIN wa_chats c ON c.jid = m.remote_jid
+           WHERE m.unread_rank <= c.unread GROUP BY m.remote_jid
+         )
+         SELECT
            c.jid,
            COALESCE(
              ${contactDisplayNameSql()},
@@ -395,8 +469,18 @@ export const createWhatsAppStore = (db: Database) => {
            c.last_message_ts,
            c.last_message_text,
            c.last_message_type,
-           c.unread
+           CASE WHEN c.unread = 1 AND COALESCE(local_reads.pending_count, 0) = 0
+             AND c.locally_read_marker_key = latest.message_key
+             AND c.last_message_ts <= latest.message_timestamp
+             THEN 0
+             ELSE MAX(0, c.unread - COALESCE(local_reads.read_count, 0))
+           END AS unread
          FROM wa_chats c
+         LEFT JOIN local_reads ON local_reads.remote_jid = c.jid
+         LEFT JOIN wa_messages latest ON latest.message_key = (
+           SELECT message_key FROM wa_messages WHERE remote_jid = c.jid
+           ORDER BY message_timestamp DESC, rowid DESC LIMIT 1
+         )
          ${contactLookupJoinsSql('c.jid')}
          ORDER BY c.last_message_ts DESC
          LIMIT ?`,
@@ -571,6 +655,7 @@ export const createWhatsAppStore = (db: Database) => {
     setChatUnread,
     incrementChatUnread,
     markChatRead,
+    markMessageRead,
     markChatUnread,
     upsertMessage,
     updateMessage,
